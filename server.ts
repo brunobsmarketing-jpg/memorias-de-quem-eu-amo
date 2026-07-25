@@ -31,6 +31,28 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', app: 'Memórias de Quem Eu Amo' });
 });
 
+// TEMPORÁRIO: diagnóstico do binário FFmpeg no ambiente de produção (remover depois de resolver o deploy)
+app.get('/api/debug-ffmpeg', async (req, res) => {
+  try {
+    const { spawn } = await import('child_process');
+    const ffmpegPath = (await import('ffmpeg-static')).default;
+    const run = (args: string[]) =>
+      new Promise<string>((resolve) => {
+        const proc = spawn(ffmpegPath as string, args);
+        let out = '';
+        proc.stdout.on('data', (d) => (out += d.toString()));
+        proc.stderr.on('data', (d) => (out += d.toString()));
+        proc.on('close', () => resolve(out));
+        proc.on('error', (e) => resolve('SPAWN_ERROR: ' + e.message));
+      });
+    const version = await run(['-version']);
+    const filters = await run(['-filters']);
+    res.json({ ffmpegPath, version, filters });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Envia um arquivo (foto, áudio, imagem gerada por IA) em base64 para o Supabase Storage
 // e devolve a URL pública permanente — usado para tirar as mídias do localStorage do navegador.
 app.post('/api/upload-media', async (req, res) => {
