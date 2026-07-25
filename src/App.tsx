@@ -278,6 +278,9 @@ export default function App() {
           Memórias de Quem Eu Amo © 2026 — Plataforma Exclusiva de Homenagens
         </p>
         <p>Acesso exclusivo para membros pagantes com gerador poético por IA, gravação de voz e cartões interativos.</p>
+        <p className="text-slate-600">
+          Trilhas sonoras: "Kevin MacLeod" (incompetech.com) — Licença Creative Commons: By Attribution 4.0 (CC BY 4.0)
+        </p>
       </footer>
     </div>
   );

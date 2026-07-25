@@ -82,23 +82,78 @@ export const PRESET_VOICES: PresetVoice[] = [
 
 
 // IMPORTANTE: os áudios ficam hospedados no nosso próprio Supabase Storage (pasta "tracks/"),
-// não mais hotlinkados direto do Pixabay — 3 dos 5 links originais do Pixabay expiraram (HTTP 403)
-// e quebravam o áudio do vídeo final silenciosamente. Ver PRESET_TRACKS_TODO.md para repor as
-// faixas que faltam.
+// não mais hotlinkados direto do Pixabay/terceiros. Faixas com licença CC-BY 4.0, compostas por
+// Kevin MacLeod (incompetech.com) — créditos exibidos no rodapé do app (ver Footer em App.tsx).
 export const PRESET_TRACKS: PresetTrack[] = [
   {
-    id: 'track-piano',
-    title: 'Piano Suave de Família',
-    category: 'Piano Emocionante',
-    audioUrl: 'https://jshdugdrqneuikrlwrum.supabase.co/storage/v1/object/public/media/tracks/track-piano.mp3',
-    durationSeconds: 60,
+    id: 'track-emotiva',
+    title: 'Promessas do Coração',
+    category: 'Emotiva',
+    audioUrl: 'https://jshdugdrqneuikrlwrum.supabase.co/storage/v1/object/public/media/tracks/track-emotiva.mp3',
+    durationSeconds: 65,
   },
   {
-    id: 'track-orchestral',
-    title: 'Amor Incondicional (Orquestral)',
-    category: 'Orquestral Leve',
-    audioUrl: 'https://jshdugdrqneuikrlwrum.supabase.co/storage/v1/object/public/media/tracks/track-orchestral.mp3',
-    durationSeconds: 60,
+    id: 'track-inspiracional',
+    title: 'Esperança Eterna',
+    category: 'Inspiracional',
+    audioUrl: 'https://jshdugdrqneuikrlwrum.supabase.co/storage/v1/object/public/media/tracks/track-inspiracional.mp3',
+    durationSeconds: 65,
+  },
+  {
+    id: 'track-alegre',
+    title: 'Momentos que Aquecem o Coração',
+    category: 'Alegre',
+    audioUrl: 'https://jshdugdrqneuikrlwrum.supabase.co/storage/v1/object/public/media/tracks/track-alegre.mp3',
+    durationSeconds: 65,
+  },
+  {
+    id: 'track-motivacional',
+    title: 'Força de Vontade',
+    category: 'Motivacional',
+    audioUrl: 'https://jshdugdrqneuikrlwrum.supabase.co/storage/v1/object/public/media/tracks/track-motivacional.mp3',
+    durationSeconds: 65,
+  },
+  {
+    id: 'track-romantica',
+    title: 'Existe Romance',
+    category: 'Romântica e Terna',
+    audioUrl: 'https://jshdugdrqneuikrlwrum.supabase.co/storage/v1/object/public/media/tracks/track-romantica.mp3',
+    durationSeconds: 65,
+  },
+  {
+    id: 'track-calma',
+    title: 'Novo Despertar',
+    category: 'Calma e Serena',
+    audioUrl: 'https://jshdugdrqneuikrlwrum.supabase.co/storage/v1/object/public/media/tracks/track-calma.mp3',
+    durationSeconds: 65,
+  },
+  {
+    id: 'track-epica',
+    title: 'Tributo Grandioso',
+    category: 'Épica e Cinematográfica',
+    audioUrl: 'https://jshdugdrqneuikrlwrum.supabase.co/storage/v1/object/public/media/tracks/track-epica.mp3',
+    durationSeconds: 65,
+  },
+  {
+    id: 'track-classica',
+    title: 'Cânone Clássico',
+    category: 'Clássica Atemporal',
+    audioUrl: 'https://jshdugdrqneuikrlwrum.supabase.co/storage/v1/object/public/media/tracks/track-classica.mp3',
+    durationSeconds: 65,
+  },
+  {
+    id: 'track-nostalgica',
+    title: 'Lembranças Reflexivas',
+    category: 'Nostálgica',
+    audioUrl: 'https://jshdugdrqneuikrlwrum.supabase.co/storage/v1/object/public/media/tracks/track-nostalgica.mp3',
+    durationSeconds: 65,
+  },
+  {
+    id: 'track-sonhadora',
+    title: 'Sonhos de Família',
+    category: 'Sonhadora e Acolhedora',
+    audioUrl: 'https://jshdugdrqneuikrlwrum.supabase.co/storage/v1/object/public/media/tracks/track-sonhadora.mp3',
+    durationSeconds: 65,
   },
 ];
 
