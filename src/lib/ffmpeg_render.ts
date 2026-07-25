@@ -28,7 +28,8 @@ export interface RenderVideoParams {
   selectedTrackId?: string;
 }
 
-const FPS = 30;
+// 24fps é suficiente para slides estáticos (sem zoom contínuo) e reduz o trabalho de codificação.
+const FPS = 24;
 const MIN_DURATION = 20;
 const MAX_DURATION = 75;
 const NARRATION_TAIL_SECONDS = 1.5;
@@ -216,12 +217,11 @@ export async function renderVideoWithFFmpeg(params: RenderVideoParams): Promise<
     }
 
     const n = imageTempPaths.length;
-    const transitionDuration = n > 1 ? Math.min(1.1, (totalDuration / n) * 0.35) : 0;
-    // Duração individual de cada clipe para que, após consumidas as sobreposições do crossfade,
-    // a duração final do vídeo bata com totalDuration.
-    const clipDuration = n > 1
-      ? (totalDuration + (n - 1) * transitionDuration) / n
-      : totalDuration;
+    // Slide estático (sem Ken Burns/crossfade) — cada foto dura o mesmo tempo, sem sobreposição.
+    const clipDuration = totalDuration / n;
+    // Fade para preto na entrada/saída de cada slide — mais leve que crossfade (não precisa
+    // manter duas fotos "vivas" na memória ao mesmo tempo, só corta com fade cada uma por vez).
+    const fadeDuration = Math.min(0.5, clipDuration * 0.2);
 
     return new Promise((resolve, reject) => {
       const command = ffmpeg();
@@ -245,27 +245,20 @@ export async function renderVideoWithFFmpeg(params: RenderVideoParams): Promise<
 
       const filters: string[] = [];
 
-      // --- Vídeo: Ken Burns por foto + crossfade entre elas ---
+      // --- Vídeo: slide estático por foto, com fade para preto na entrada/saída ---
       for (let i = 0; i < n; i++) {
+        const fadeOutStart = Math.max(0, clipDuration - fadeDuration);
         filters.push(
           `[${i}:v]scale=1080:1080:force_original_aspect_ratio=increase,crop=1080:1080,fps=${FPS},` +
-          `zoompan=z='min(zoom+0.0006,1.15)':d=${Math.max(2, Math.round(clipDuration * FPS))}:` +
-          `x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1080:fps=${FPS},setsar=1[v${i}]`
+          `fade=t=in:st=0:d=${fadeDuration.toFixed(3)},fade=t=out:st=${fadeOutStart.toFixed(3)}:d=${fadeDuration.toFixed(3)},setsar=1[v${i}]`
         );
       }
 
       let videoLabel = 'v0';
       if (n > 1) {
-        let prevLabel = 'v0';
-        for (let k = 1; k < n; k++) {
-          const offset = k * (clipDuration - transitionDuration);
-          const outLabel = k === n - 1 ? 'vxfinal' : `vx${k}`;
-          filters.push(
-            `[${prevLabel}][v${k}]xfade=transition=fade:duration=${transitionDuration.toFixed(3)}:offset=${offset.toFixed(3)}[${outLabel}]`
-          );
-          prevLabel = outLabel;
-        }
-        videoLabel = prevLabel;
+        const concatInputs = Array.from({ length: n }, (_, i) => `[v${i}]`).join('');
+        filters.push(`${concatInputs}concat=n=${n}:v=1:a=0[vconcat]`);
+        videoLabel = 'vconcat';
       }
 
       // --- Título fixo com o nome do pai ---
@@ -325,6 +318,8 @@ export async function renderVideoWithFFmpeg(params: RenderVideoParams): Promise<
 
       const outputOptions = [
         '-c:v libx264',
+        '-preset veryfast', // menos memória/CPU no encoder (troca um pouco de eficiência de compressão por leveza)
+        '-threads 1', // evita overhead de múltiplas threads em ambientes com pouca CPU/RAM (ex: Render free tier)
         '-pix_fmt yuv420p',
         `-r ${FPS}`,
         `-t ${totalDuration.toFixed(2)}`,
