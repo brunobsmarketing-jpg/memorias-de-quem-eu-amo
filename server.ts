@@ -1,7 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
 import path from 'path';
-import { GoogleGenAI, Modality, Type } from '@google/genai';
 import OpenAI from 'openai';
 import { createServer as createViteServer } from 'vite';
 import fs from 'fs';
@@ -19,16 +18,6 @@ if (!fs.existsSync(rendersPath)) {
 app.use('/renders', express.static(rendersPath));
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
-
-// Initialize Gemini Client
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY || '',
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
-    },
-  },
-});
 
 // ElevenLabs configuration
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || '';
@@ -397,15 +386,13 @@ DIRETRIZES DE ESTILO E CRIATIVIDADE (MUITO IMPORTANTE):
 4. **TAMANHO**: De 70 a 110 palavras (cerca de 35 a 50 segundos de narração).
 5. **SEM FORMATAÇÃO EXTRA**: Não use emojis, hashtags ou títulos. Retorne apenas o texto da narração lírica pronto para leitura.`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-      config: {
-        temperature: 0.85,
-      },
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.85,
     });
 
-    const generatedText = response.text ? response.text.trim() : '';
+    const generatedText = response.choices[0]?.message?.content?.trim() || '';
     res.json({ text: generatedText });
   } catch (error: any) {
     console.error('Erro na geração de texto:', error);
@@ -427,32 +414,38 @@ Texto: "${text}"
 
 Retorne um JSON com a lista de 2 descrições visuais em inglês para geração de arte. As ilustrações NUNCA devem tentar simular fotos de pessoas reais específicas, mas sim conceitos simbólicos calorosos (ex: silhueta de pai e criança de mãos dadas ao pôr do sol, casa acolhedora com luz suave, árvore de carvalho forte simbolizando proteção).`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            scenes: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  titlePt: { type: Type.STRING, description: 'Título da cena em português' },
-                  promptEn: { type: Type.STRING, description: 'Prompt detalhado em inglês para estilo aquarela suave' },
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'visual_themes',
+          strict: true,
+          schema: {
+            type: 'object',
+            properties: {
+              scenes: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    titlePt: { type: 'string', description: 'Título da cena em português' },
+                    promptEn: { type: 'string', description: 'Prompt detalhado em inglês para estilo aquarela suave' },
+                  },
+                  required: ['titlePt', 'promptEn'],
+                  additionalProperties: false,
                 },
-                required: ['titlePt', 'promptEn'],
               },
             },
+            required: ['scenes'],
+            additionalProperties: false,
           },
-          required: ['scenes'],
         },
       },
     });
 
-    const json = JSON.parse(response.text || '{"scenes":[]}');
+    const json = JSON.parse(response.choices[0]?.message?.content || '{"scenes":[]}');
     res.json(json);
   } catch (error: any) {
     console.error('Erro na extração de temas visuais:', error);
