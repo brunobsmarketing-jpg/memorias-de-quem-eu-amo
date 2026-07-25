@@ -8,3 +8,4 @@ coverage/
 !.env.example
 public/renders/
 .claude/
+ffmpeg-bin/
