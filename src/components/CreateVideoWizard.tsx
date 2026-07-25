@@ -77,8 +77,9 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
       durationSeconds: Math.max(25, (validPhotos.length + (useAIImages ? aiImages.length : 0)) * 6),
     };
 
-    // Guarda uma cópia local imediatamente (experiência rápida, mesmo se a rede estiver lenta)
-    saveVideoJob(newJob);
+    // Mostra a prévia imediatamente a partir do estado em memória (sem tocar no localStorage
+    // ainda) — fotos e imagens de IA em base64 podem facilmente estourar a cota do navegador
+    // (5-10MB), o que travaria esta função antes mesmo de trocar de tela.
     setCreatedJob(newJob);
     setCurrentStep(6); // Força avanço para Step 6: Preview & Unlock
 

@@ -54,7 +54,13 @@ export function saveVideoJob(video: VideoJob): VideoJob[] {
   } else {
     updated = [video, ...current];
   }
-  localStorage.setItem(VIDEOS_STORAGE_KEY, JSON.stringify(updated));
+  try {
+    localStorage.setItem(VIDEOS_STORAGE_KEY, JSON.stringify(updated));
+  } catch (e) {
+    // Cota do localStorage estourada (comum com fotos/imagens em base64) — o Supabase
+    // já é a fonte da verdade para o vídeo, então não deixamos isso quebrar o fluxo.
+    console.warn('Não foi possível salvar vídeos no localStorage (cota excedida?):', e);
+  }
   return updated;
 }
 
