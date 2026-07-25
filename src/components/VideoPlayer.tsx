@@ -1,22 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Play, Pause, RotateCcw, Volume2, VolumeX, Download, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Play, Pause, RotateCcw, Volume2, VolumeX, Download, CheckCircle2 } from 'lucide-react';
 import { VideoJob } from '../types';
 import { drawVideoFrame, getAllSlides } from '../lib/video';
 import { PRESET_TRACKS } from '../data/presets';
 
 interface VideoPlayerProps {
   video: VideoJob;
-  isUnlocked?: boolean;
-  onUnlockRequest?: () => void;
-  showUnlockCTA?: boolean;
 }
 
-export const VideoPlayer: React.FC<VideoPlayerProps> = ({
-  video,
-  isUnlocked = false,
-  onUnlockRequest,
-  showUnlockCTA = true,
-}) => {
+export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const musicAudioRef = useRef<HTMLAudioElement | null>(null);
   const narrationAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -131,7 +123,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         fadeProgress,
         zoomScale,
         currentSubtitle,
-        !isUnlocked, // Watermark visible if not unlocked
         video.fatherName
       );
 
@@ -156,7 +147,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return () => {
       cancelAnimationFrame(animFrameId);
     };
-  }, [isPlaying, currentTime, duration, isReady, preloadedImages, isUnlocked, video]);
+  }, [isPlaying, currentTime, duration, isReady, preloadedImages, video]);
 
   // Audio Playback Sync
   const togglePlay = () => {
@@ -265,15 +256,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
         {/* Status Badge */}
         <div className="absolute top-4 left-4 z-10 flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold backdrop-blur-md bg-slate-900/70 border border-white/10 text-white shadow-lg">
-          {isUnlocked ? (
-            <span className="flex items-center gap-1.5 text-emerald-400">
-              <CheckCircle2 className="w-4 h-4" /> HD Liberação Completa (Sem Marca d'Água)
-            </span>
-          ) : (
-            <span className="flex items-center gap-1.5 text-amber-400">
-              <Sparkles className="w-4 h-4 animate-pulse" /> Modo Prévia com Marca d'Água
-            </span>
-          )}
+          <span className="flex items-center gap-1.5 text-emerald-400">
+            <CheckCircle2 className="w-4 h-4" /> HD Sem Marca d'Água
+          </span>
         </div>
 
         {/* Video Overlays Controls */}
@@ -322,37 +307,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         </div>
       </div>
 
-      {/* Action Buttons & Unlocking Banner */}
+      {/* Action Buttons */}
       <div className="w-full max-w-lg mt-5 flex flex-col gap-3">
-        {!isUnlocked && showUnlockCTA && (
-          <div className="p-4 rounded-xl bg-gradient-to-r from-amber-500/10 via-amber-500/20 to-orange-500/10 border border-amber-500/30 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div>
-              <h4 className="text-sm font-semibold text-amber-200 flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-amber-400" /> Remova a Marca d'Água em HD
-              </h4>
-              <p className="text-xs text-slate-300 mt-0.5">
-                Consuma 1 crédito para liberar o link oficial em alta definição + Cartão Digital com QR Code para enviar ao seu pai.
-              </p>
-            </div>
-            <button
-              onClick={onUnlockRequest}
-              className="w-full sm:w-auto px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold text-sm rounded-lg shadow-md transition-all active:scale-95 whitespace-nowrap flex items-center justify-center gap-2"
-            >
-              <Sparkles className="w-4 h-4" /> Liberação Final (1 Crédito)
-            </button>
-          </div>
-        )}
-
-        {isUnlocked && (
-          <button
-            onClick={handleDownloadVideo}
-            disabled={isRecordingExport}
-            className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-semibold text-sm rounded-xl border border-slate-700 flex items-center justify-center gap-2 transition-all active:scale-98 shadow-md"
-          >
-            <Download className="w-4 h-4 text-amber-400" />
-            {isRecordingExport ? 'Renderizando MP4 com FFmpeg...' : 'Baixar Vídeo em HD (.MP4)'}
-          </button>
-        )}
+        <button
+          onClick={handleDownloadVideo}
+          disabled={isRecordingExport}
+          className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-semibold text-sm rounded-xl border border-slate-700 flex items-center justify-center gap-2 transition-all active:scale-98 shadow-md"
+        >
+          <Download className="w-4 h-4 text-amber-400" />
+          {isRecordingExport ? 'Renderizando MP4 com FFmpeg...' : 'Baixar Vídeo em HD (.MP4)'}
+        </button>
       </div>
     </div>
   );

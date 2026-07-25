@@ -46,7 +46,28 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [syncError, setSyncError] = useState<string>('');
 
+  const [isGeneratingJob, setIsGeneratingJob] = useState<boolean>(false);
+
   const handleGeneratePreviewJob = async () => {
+    if (user.credits < 1) {
+      alert('Você não tem créditos suficientes para criar um novo vídeo. Adicione créditos no seu painel.');
+      return;
+    }
+
+    setIsGeneratingJob(true);
+
+    // O crédito representa "quantos vídeos essa pessoa pode criar" — é gasto aqui, na criação,
+    // já que não existe mais etapa de desbloqueio (a pessoa já está numa área paga).
+    let updatedUser: User;
+    try {
+      updatedUser = await deductCreditRemote(user.id);
+    } catch (e: any) {
+      alert(e.message || 'Não foi possível criar o vídeo agora. Tente novamente.');
+      setIsGeneratingJob(false);
+      return;
+    }
+    setUser(updatedUser);
+
     const videoId = `vid_${Date.now()}`;
     const cardUrl = `${window.location.origin}/c/${videoId}`;
 
@@ -70,7 +91,7 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
       selectedTrackId,
       useAIImages,
       aiGeneratedImages: aiImages,
-      status: 'watermarked',
+      status: 'unlocked',
       progress: 100,
       cardUrl,
       createdAt: new Date().toISOString(),
@@ -81,7 +102,8 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
     // ainda) — fotos e imagens de IA em base64 podem facilmente estourar a cota do navegador
     // (5-10MB), o que travaria esta função antes mesmo de trocar de tela.
     setCreatedJob(newJob);
-    setCurrentStep(6); // Força avanço para Step 6: Preview & Unlock
+    setCurrentStep(6);
+    setIsGeneratingJob(false);
 
     // Envia as mídias para o Supabase e salva o registro central, para o cartão
     // digital funcionar em qualquer dispositivo (não só no navegador de quem criou).
@@ -97,35 +119,6 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
       setSyncError('Não foi possível salvar este vídeo no servidor. O link do cartão pode não abrir em outros dispositivos até tentar novamente.');
     } finally {
       setIsSyncing(false);
-    }
-  };
-
-  const handleUnlockHDVersion = async () => {
-    if (!createdJob) return;
-
-    if (user.credits < 1) {
-      alert('Você precisa de 1 crédito para liberar o vídeo sem marca d\'água. Recarregue seus créditos no painel.');
-      return;
-    }
-
-    try {
-      const updatedUser = await deductCreditRemote(user.id);
-      setUser(updatedUser);
-      const unlockedJob: VideoJob = {
-        ...createdJob,
-        status: 'unlocked',
-      };
-      saveVideoJob(unlockedJob);
-      setCreatedJob(unlockedJob);
-      onFinish(unlockedJob);
-
-      try {
-        await saveVideoJobRemote(unlockedJob);
-      } catch (e) {
-        console.error('Erro ao sincronizar liberação do vídeo com o servidor:', e);
-      }
-    } catch (e: any) {
-      alert(e.message || 'Não foi possível liberar o vídeo. Tente novamente.');
     }
   };
 
@@ -225,6 +218,7 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
             fatherName={fatherName}
             onNext={handleGeneratePreviewJob}
             onBack={() => setCurrentStep(4)}
+            isSubmitting={isGeneratingJob}
           />
         )}
 
@@ -232,22 +226,18 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
         {currentStep === 6 && createdJob && (
           <div className="space-y-6 text-center">
             <div className="space-y-2">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-300 border border-amber-500/20">
-                <Sparkles className="w-3.5 h-3.5" /> Prévia do Vídeo Gerada!
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Vídeo Pronto em HD!
               </span>
               <h3 className="text-2xl font-bold text-slate-100">
-                Veja a Prévia da Homenagem para {createdJob.fatherName}
+                Sua Homenagem para {createdJob.fatherName} está pronta
               </h3>
               <p className="text-slate-400 text-sm max-w-md mx-auto">
-                Assista abaixo com a marca d'água de teste. Se aprovado, use 1 crédito para liberar o arquivo em HD + Cartão Digital público.
+                Baixe o vídeo em HD ou avance para pegar o link do Cartão Digital e enviar para o seu pai.
               </p>
             </div>
 
-            <VideoPlayer
-              video={createdJob}
-              isUnlocked={createdJob.status === 'unlocked'}
-              onUnlockRequest={handleUnlockHDVersion}
-            />
+            <VideoPlayer video={createdJob} />
 
             {isSyncing && (
               <div className="p-3 bg-slate-800/80 rounded-xl border border-slate-700 text-slate-300 text-xs font-semibold flex items-center justify-center gap-2">
@@ -261,11 +251,12 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
               </div>
             )}
 
-            {createdJob.status === 'unlocked' && (
-              <div className="p-4 bg-emerald-500/20 rounded-2xl border border-emerald-500/30 text-emerald-300 font-bold text-sm flex items-center justify-center gap-2">
-                <CheckCircle2 className="w-5 h-5" /> Vídeo HD Liberado! Acessando Cartão Digital...
-              </div>
-            )}
+            <button
+              onClick={() => onFinish(createdJob)}
+              className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-extrabold text-sm rounded-xl shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2 mx-auto"
+            >
+              <Sparkles className="w-4 h-4" /> Ver Cartão Digital e Compartilhar
+            </button>
           </div>
         )}
       </div>

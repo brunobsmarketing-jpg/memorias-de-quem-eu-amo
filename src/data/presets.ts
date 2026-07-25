@@ -1,33 +1,49 @@
 import { PresetVoice, PresetTrack, CreditPackage } from '../types';
 
+// Vozes com sotaque brasileiro (melhor pra narrar português do que as vozes em inglês
+// americano usadas antes) — IDs reais da nossa conta ElevenLabs, confirmados via API.
 export const PRESET_VOICES: PresetVoice[] = [
   {
     id: 'voice-1',
-    name: 'Carlos — Voz Calma e Afetuosa',
+    name: 'Arthur — Voz Calorosa e Confiante',
     gender: 'male',
-    tone: 'Emocionante e acolhedora',
-    elevenLabsVoiceId: 'TxGEqnHWrfWFTfGW9XjX', // Josh
+    tone: 'Acolhedora e profissional',
+    elevenLabsVoiceId: '5lrBPYY4YvMbKHTo8kvZ', // Arthur Freeman
   },
   {
     id: 'voice-2',
-    name: 'Helena — Voz Suave e Expressiva',
+    name: 'Katiuscia — Voz Doce e Gentil',
     gender: 'female',
-    tone: 'Doce e carinhosa',
-    elevenLabsVoiceId: '21m00Tcm4TlvDq8ikWAM', // Rachel
+    tone: 'Suave e carinhosa',
+    elevenLabsVoiceId: 'wXwzHFLHnXex5h3JPBXA', // Katiuscia
   },
   {
     id: 'voice-3',
-    name: 'Gabriel — Voz Grave e Profunda',
-    gender: 'male',
-    tone: 'Nostálgica e marcante',
-    elevenLabsVoiceId: 'VR6AewLTigWG4xSOukaG', // Arnold
+    name: 'Keren — Voz Vibrante e Encantadora',
+    gender: 'female',
+    tone: 'Doce e envolvente',
+    elevenLabsVoiceId: '33B4UnXyTNbgLmdEDh5P', // Keren
   },
   {
     id: 'voice-4',
-    name: 'Mariana — Voz Serena e Calorosa',
+    name: 'Fernanda — Voz Natural e Acolhedora',
     gender: 'female',
-    tone: 'Sincera e emocionante',
-    elevenLabsVoiceId: 'EXAVITQu4vr4xnSDxMaL', // Bella
+    tone: 'Conversacional e sincera',
+    elevenLabsVoiceId: 'KHmfNHtEjHhLK9eER20w', // Fernanda (Natural Conversations)
+  },
+  {
+    id: 'voice-5',
+    name: 'Malu — Voz Descontraída e Espontânea',
+    gender: 'female',
+    tone: 'Leve e natural',
+    elevenLabsVoiceId: 'fhtZMBwha5du5OxuvexO', // Malu
+  },
+  {
+    id: 'voice-6',
+    name: 'Regi — Voz Serena e Envolvente',
+    gender: 'female',
+    tone: 'Calma e próxima',
+    elevenLabsVoiceId: 'QHXbC1UI61ujIZ9SUNGc', // Regi Piroli
   },
 ];
 

@@ -104,8 +104,6 @@ export const DigitalCardPage: React.FC<DigitalCardPageProps> = ({ video, onGoHom
     }
   };
 
-  const isUnlocked = video.status === 'unlocked';
-
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 py-12 px-4 flex flex-col items-center justify-between">
       <div className="w-full max-w-2xl mx-auto space-y-8">
@@ -124,7 +122,7 @@ export const DigitalCardPage: React.FC<DigitalCardPageProps> = ({ video, onGoHom
 
         {/* Video Player Box */}
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl">
-          <VideoPlayer video={video} isUnlocked={isUnlocked} showUnlockCTA={false} />
+          <VideoPlayer video={video} />
         </div>
 
         {/* Emotional Message Text Card */}

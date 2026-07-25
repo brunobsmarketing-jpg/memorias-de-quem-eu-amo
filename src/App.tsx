@@ -241,7 +241,7 @@ export default function App() {
                     </a>
                   </div>
 
-                  <VideoPlayer video={activeVideo} isUnlocked={activeVideo.status === 'unlocked'} />
+                  <VideoPlayer video={activeVideo} />
                 </div>
               </div>
             )}

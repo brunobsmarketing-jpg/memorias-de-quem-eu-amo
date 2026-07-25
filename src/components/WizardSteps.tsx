@@ -766,6 +766,7 @@ interface Step5AIImagesProps {
   fatherName: string;
   onNext: () => void;
   onBack: () => void;
+  isSubmitting?: boolean;
 }
 
 export const Step5AIImagesOption: React.FC<Step5AIImagesProps> = ({
@@ -777,6 +778,7 @@ export const Step5AIImagesOption: React.FC<Step5AIImagesProps> = ({
   fatherName,
   onNext,
   onBack,
+  isSubmitting = false,
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatingProgress, setGeneratingProgress] = useState(0);
@@ -908,13 +910,19 @@ export const Step5AIImagesOption: React.FC<Step5AIImagesProps> = ({
           Voltar
         </button>
         <button
-          onClick={() => {
-            console.log('Avançando para o vídeo...');
-            onNext();
-          }}
-          className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-2"
+          onClick={onNext}
+          disabled={isSubmitting}
+          className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-50 text-slate-950 font-bold rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-2"
         >
-          <Sparkles className="w-5 h-5" /> Gerar Vídeo e Prévia
+          {isSubmitting ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" /> Gerando...
+            </>
+          ) : (
+            <>
+              <Sparkles className="w-5 h-5" /> Gerar Vídeo e Prévia
+            </>
+          )}
         </button>
       </div>
     </div>

@@ -7,7 +7,6 @@ export interface VideoRenderFrame {
   fadeProgress: number; // 0 to 1
   zoomScale: number;
   subtitleText: string;
-  watermark: boolean;
 }
 
 export function getAllSlides(video: VideoJob): { id: string; url: string; title?: string }[] {
@@ -28,7 +27,7 @@ export function getAllSlides(video: VideoJob): { id: string; url: string; title?
   return userPhotos;
 }
 
-// Draw a single HD frame on canvas with Ken Burns effect, fade transition, subtitles, and watermark
+// Draw a single HD frame on canvas with Ken Burns effect, fade transition, and subtitles
 export function drawVideoFrame(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -38,7 +37,6 @@ export function drawVideoFrame(
   fadeProgress: number,
   zoomScale: number,
   subtitleText: string,
-  watermark: boolean,
   fatherName: string
 ) {
   // Clear canvas background
@@ -147,24 +145,4 @@ export function drawVideoFrame(
   ctx.textAlign = 'center';
   ctx.fillText(`Homenagem para ${fatherName || 'Meu Pai'}`, width / 2, 60);
   ctx.restore();
-
-  // Watermark Banner if needed
-  if (watermark) {
-    ctx.save();
-    ctx.translate(width / 2, height / 2);
-    ctx.rotate((-25 * Math.PI) / 180);
-
-    ctx.fillStyle = 'rgba(239, 68, 68, 0.28)'; // Warm translucent red
-    ctx.fillRect(-width, -50, width * 2, 100);
-
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '800 42px "Plus Jakarta Sans", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.shadowColor = '#000000';
-    ctx.shadowBlur = 12;
-    ctx.fillText('PRÉVIA - MEMÓRIAS DE QUEM EU AMO', 0, 0);
-
-    ctx.restore();
-  }
 }
