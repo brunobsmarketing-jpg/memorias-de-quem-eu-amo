@@ -190,11 +190,20 @@ export async function renderVideoWithFFmpeg(params: RenderVideoParams): Promise<
       throw new Error('Nenhuma foto disponível para renderizar o vídeo.');
     }
 
-    // 2. Salvar narração em arquivo temporário, se houver
+    // 2. Salvar narração em arquivo temporário, se houver — pode chegar como data URL (base64,
+    // caso acabou de ser gerada) ou como URL https do Supabase Storage (caso o vídeo já tenha
+    // sido sincronizado antes do download, quando o data URL é substituído por uma URL permanente).
     let narrationTempPath = '';
-    if (params.narrationAudioDataUrl && params.narrationAudioDataUrl.startsWith('data:audio')) {
+    if (params.narrationAudioDataUrl?.startsWith('data:audio')) {
       narrationTempPath = saveBase64ToTempFile(params.narrationAudioDataUrl, 'narration', 'mp3');
       tempFilesToDelete.push(narrationTempPath);
+    } else if (params.narrationAudioDataUrl?.startsWith('http')) {
+      try {
+        narrationTempPath = await downloadUrlToTempFile(params.narrationAudioDataUrl, 'narration', 'mp3');
+        tempFilesToDelete.push(narrationTempPath);
+      } catch (narrationErr) {
+        console.warn('⚠️ Não foi possível baixar a narração, seguindo sem ela:', narrationErr);
+      }
     }
 
     // 3. Baixar a trilha sonora escolhida
