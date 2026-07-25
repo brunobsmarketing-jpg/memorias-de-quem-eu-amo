@@ -3,6 +3,7 @@ import ffmpegPath from 'ffmpeg-static';
 import fs from 'fs';
 import path from 'path';
 import { spawn } from 'child_process';
+import { createCanvas, GlobalFonts } from '@napi-rs/canvas';
 import { PRESET_TRACKS } from '../data/presets';
 
 if (ffmpegPath) {
@@ -27,6 +28,83 @@ const NARRATION_TAIL_SECONDS = 1.5;
 // Fonte empacotada no próprio projeto (assets/fonts) em vez de um caminho do sistema operacional —
 // um caminho como "C:/Windows/Fonts/arial.ttf" não existiria no Linux do servidor de produção.
 const FONT_PATH = path.join(process.cwd(), 'assets', 'fonts', 'Poppins-Bold.ttf');
+const FONT_FAMILY = 'PoppinsBoldMemorias';
+GlobalFonts.registerFromPath(FONT_PATH, FONT_FAMILY);
+
+const CANVAS_SIZE = 1080;
+
+/**
+ * Desenha um retângulo com cantos arredondados (compatibilidade — nem toda build do canvas tem roundRect nativo).
+ */
+function drawRoundedRect(ctx: any, x: number, y: number, width: number, height: number, radius: number) {
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.arcTo(x + width, y, x + width, y + height, radius);
+  ctx.arcTo(x + width, y + height, x, y + height, radius);
+  ctx.arcTo(x, y + height, x, y, radius);
+  ctx.arcTo(x, y, x + width, y, radius);
+  ctx.closePath();
+}
+
+/**
+ * Renderiza o título (nome do pai) como PNG transparente 1080x1080, para ser sobreposto ao vídeo
+ * via overlay do FFmpeg — evita depender do filtro drawtext, que não existe no build estático
+ * do FFmpeg usado em produção (Linux).
+ */
+function renderTitlePng(text: string): Buffer {
+  const canvas = createCanvas(CANVAS_SIZE, CANVAS_SIZE);
+  const ctx = canvas.getContext('2d');
+  ctx.font = `46px "${FONT_FAMILY}"`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineWidth = 6;
+  ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+  ctx.strokeText(text, CANVAS_SIZE / 2, 70);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(text, CANVAS_SIZE / 2, 70);
+  return canvas.toBuffer('image/png');
+}
+
+/**
+ * Renderiza um cartão de legenda (fundo semitransparente + texto) como PNG transparente 1080x1080.
+ */
+function renderSubtitlePng(lines: string[]): Buffer {
+  const canvas = createCanvas(CANVAS_SIZE, CANVAS_SIZE);
+  const ctx = canvas.getContext('2d');
+
+  const padding = 40;
+  const cardWidth = CANVAS_SIZE - padding * 2;
+  const lineHeight = 50;
+  const cardHeight = Math.max(120, lines.length * lineHeight + 60);
+  const cardX = padding;
+  const cardY = CANVAS_SIZE - cardHeight - 80;
+
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.7)';
+  drawRoundedRect(ctx, cardX, cardY, cardWidth, cardHeight, 20);
+  ctx.fill();
+
+  ctx.font = `42px "${FONT_FAMILY}"`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#ffffff';
+
+  const startY = cardY + cardHeight / 2 - ((lines.length - 1) * lineHeight) / 2;
+  lines.forEach((line, i) => {
+    ctx.fillText(line, CANVAS_SIZE / 2, startY + i * lineHeight);
+  });
+
+  return canvas.toBuffer('image/png');
+}
+
+function savePngToTempFile(buffer: Buffer, prefix: string): string {
+  const tempDir = path.join(process.cwd(), 'public', 'renders', 'temp');
+  if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir, { recursive: true });
+  }
+  const filePath = path.join(tempDir, `${prefix}_${Date.now()}_${Math.random().toString(36).substring(7)}.png`);
+  fs.writeFileSync(filePath, buffer);
+  return filePath;
+}
 
 function saveBase64ToTempFile(dataUrl: string, prefix: string, ext: string): string {
   const tempDir = path.join(process.cwd(), 'public', 'renders', 'temp');
@@ -52,16 +130,6 @@ async function downloadUrlToTempFile(url: string, prefix: string, ext: string): 
   const buf = Buffer.from(await response.arrayBuffer());
   const filePath = path.join(tempDir, `${prefix}_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`);
   fs.writeFileSync(filePath, buf);
-  return filePath;
-}
-
-function writeTempTextFile(content: string, prefix: string): string {
-  const tempDir = path.join(process.cwd(), 'public', 'renders', 'temp');
-  if (!fs.existsSync(tempDir)) {
-    fs.mkdirSync(tempDir, { recursive: true });
-  }
-  const filePath = path.join(tempDir, `${prefix}_${Date.now()}_${Math.random().toString(36).substring(7)}.txt`);
-  fs.writeFileSync(filePath, content, 'utf8');
   return filePath;
 }
 
@@ -101,8 +169,8 @@ function splitIntoSentences(text: string): string[] {
     .filter(Boolean);
 }
 
-/** Quebra um texto em linhas curtas para caber na legenda queimada no vídeo. */
-function wrapTextForSubtitle(text: string, maxCharsPerLine = 28, maxLines = 3): string {
+/** Quebra um texto em linhas curtas para caber no cartão de legenda do vídeo. */
+function wrapTextForSubtitle(text: string, maxCharsPerLine = 28, maxLines = 3): string[] {
   const words = text.split(/\s+/).filter(Boolean);
   const lines: string[] = [];
   let current = '';
@@ -121,20 +189,9 @@ function wrapTextForSubtitle(text: string, maxCharsPerLine = 28, maxLines = 3): 
   if (lines.length > maxLines) {
     const head = lines.slice(0, maxLines - 1);
     const tail = lines.slice(maxLines - 1).join(' ');
-    return [...head, tail].join('\n');
+    return [...head, tail];
   }
-  return lines.join('\n');
-}
-
-/**
- * Caminho normalizado e entre aspas simples, pronto para uso como valor de opção no filtergraph do FFmpeg.
- * O ':' do drive letter do Windows (ex: C:/...) precisa ser escapado mesmo dentro de aspas simples,
- * senão o parser de filtros do FFmpeg o interpreta como separador de opção.
- */
-function quoteFilterPath(p: string): string {
-  const forwardSlashes = p.replace(/\\/g, '/');
-  const escapedColon = forwardSlashes.replace(/:/g, '\\:');
-  return `'${escapedColon}'`;
+  return lines;
 }
 
 /**
@@ -215,6 +272,21 @@ export async function renderVideoWithFFmpeg(params: RenderVideoParams): Promise<
       ? (totalDuration + (n - 1) * transitionDuration) / n
       : totalDuration;
 
+    // Gera o título e as legendas como PNGs transparentes (via canvas), para sobrepor ao vídeo
+    // com o filtro overlay — mais portável que drawtext, que não existe no FFmpeg estático do Linux.
+    const titlePngPath = savePngToTempFile(
+      renderTitlePng(`Homenagem para ${params.fatherName || 'Meu Pai'}`),
+      'title'
+    );
+    tempFilesToDelete.push(titlePngPath);
+
+    const sentences = splitIntoSentences(params.tributeText);
+    const subtitlePngPaths = sentences.map((sentence, idx) => {
+      const p = savePngToTempFile(renderSubtitlePng(wrapTextForSubtitle(sentence)), `sub_${idx}`);
+      tempFilesToDelete.push(p);
+      return p;
+    });
+
     return new Promise((resolve, reject) => {
       const command = ffmpeg();
 
@@ -223,15 +295,25 @@ export async function renderVideoWithFFmpeg(params: RenderVideoParams): Promise<
         command.input(imgPath).inputOptions(['-loop 1', `-t ${clipDuration.toFixed(3)}`]);
       });
 
+      const titleInputIndex = imageTempPaths.length;
+      command.input(titlePngPath).inputOptions(['-loop 1', `-t ${totalDuration.toFixed(3)}`]);
+
+      const subtitleInputIndexes = subtitlePngPaths.map((p, idx) => {
+        command.input(p).inputOptions(['-loop 1', `-t ${totalDuration.toFixed(3)}`]);
+        return imageTempPaths.length + 1 + idx;
+      });
+
+      const mediaInputsBase = imageTempPaths.length + 1 + subtitlePngPaths.length;
+
       let narrationInputIndex = -1;
       if (narrationTempPath) {
-        narrationInputIndex = imageTempPaths.length;
+        narrationInputIndex = mediaInputsBase;
         command.input(narrationTempPath);
       }
 
       let musicInputIndex = -1;
       if (musicTempPath) {
-        musicInputIndex = imageTempPaths.length + (narrationTempPath ? 1 : 0);
+        musicInputIndex = mediaInputsBase + (narrationTempPath ? 1 : 0);
         command.input(musicTempPath);
       }
 
@@ -260,30 +342,19 @@ export async function renderVideoWithFFmpeg(params: RenderVideoParams): Promise<
         videoLabel = prevLabel;
       }
 
-      // --- Título fixo com o nome do pai ---
-      const titleTextPath = writeTempTextFile(`Homenagem para ${params.fatherName || 'Meu Pai'}`, 'title');
-      tempFilesToDelete.push(titleTextPath);
-      filters.push(
-        `[${videoLabel}]drawtext=textfile=${quoteFilterPath(titleTextPath)}:fontfile=${quoteFilterPath(FONT_PATH)}:` +
-        `fontsize=46:fontcolor=white:borderw=3:bordercolor=black@0.6:x=(w-text_w)/2:y=70[vtitle]`
-      );
+      // --- Título fixo com o nome do pai (overlay do PNG gerado via canvas) ---
+      filters.push(`[${videoLabel}][${titleInputIndex}:v]overlay=0:0[vtitle]`);
       videoLabel = 'vtitle';
 
-      // --- Legendas queimadas, sincronizadas por trecho do texto ---
-      const sentences = splitIntoSentences(params.tributeText);
+      // --- Legendas, sincronizadas por trecho do texto (overlay dos PNGs gerados via canvas) ---
       if (sentences.length > 0) {
         const perChunk = totalDuration / sentences.length;
-        sentences.forEach((sentence, idx) => {
+        subtitleInputIndexes.forEach((inputIdx, idx) => {
           const start = idx * perChunk;
           const end = (idx + 1) * perChunk;
-          const wrapped = wrapTextForSubtitle(sentence);
-          const subPath = writeTempTextFile(wrapped, `sub_${idx}`);
-          tempFilesToDelete.push(subPath);
           const outLabel = `vsub${idx}`;
           filters.push(
-            `[${videoLabel}]drawtext=textfile=${quoteFilterPath(subPath)}:fontfile=${quoteFilterPath(FONT_PATH)}:` +
-            `fontsize=42:fontcolor=white:line_spacing=8:box=1:boxcolor=black@0.55:boxborderw=24:` +
-            `x=(w-text_w)/2:y=h-300:enable='between(t,${start.toFixed(2)},${end.toFixed(2)})'[${outLabel}]`
+            `[${videoLabel}][${inputIdx}:v]overlay=0:0:enable='between(t,${start.toFixed(2)},${end.toFixed(2)})'[${outLabel}]`
           );
           videoLabel = outLabel;
         });
