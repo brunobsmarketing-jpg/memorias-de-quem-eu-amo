@@ -21,6 +21,7 @@ import { PRESET_VOICES, PRESET_TRACKS } from '../data/presets';
 import { generateAITributeText } from '../lib/textgen';
 import { extractVisualThemesFromText, generateWatercolorCanvasImage, VisualTheme } from '../lib/imagegen';
 import { VoiceRecorder, synthesizeTTSNarration, cloneVoiceAndSynthesize } from '../lib/voice';
+import { resizeImageToDataUrl, MAX_UPLOAD_FILE_SIZE_BYTES, formatFileSizeMB } from '../lib/imageUtils';
 
 // --- STEP 1: Upload de Fotos ---
 interface Step1UploadProps {
@@ -30,28 +31,46 @@ interface Step1UploadProps {
 }
 
 export const Step1UploadPhotos: React.FC<Step1UploadProps> = ({ photos, setPhotos, onNext }) => {
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files) return;
-    const files = Array.from(e.target.files);
+  const [isProcessingPhotos, setIsProcessingPhotos] = useState(false);
 
-    const newPhotos: PhotoItem[] = [];
-    files.forEach((file: File, index: number) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const files: File[] = Array.from(e.target.files);
+    e.target.value = ''; // permite selecionar o mesmo arquivo de novo depois, se precisar
+
+    const oversized = files.filter((f) => f.size > MAX_UPLOAD_FILE_SIZE_BYTES);
+    const validFiles = files.filter((f) => f.size <= MAX_UPLOAD_FILE_SIZE_BYTES);
+
+    if (oversized.length > 0) {
+      alert(
+        `${oversized.length} foto(s) acima de ${formatFileSizeMB(MAX_UPLOAD_FILE_SIZE_BYTES)}MB foram ignoradas: ` +
+        oversized.map((f) => `${f.name} (${formatFileSizeMB(f.size)}MB)`).join(', ')
+      );
+    }
+
+    setIsProcessingPhotos(true);
+    try {
+      for (let index = 0; index < validFiles.length; index++) {
+        const file = validFiles[index];
+        try {
+          const url = await resizeImageToDataUrl(file);
           setPhotos((prev) => [
             ...prev,
             {
               id: `photo_${Date.now()}_${index}`,
-              url: event.target?.result as string,
+              url,
               name: file.name,
-              order: prev.length + index,
+              order: prev.length,
             },
           ]);
+        } catch (err) {
+          console.error(`Falha ao processar a foto ${file.name}:`, err);
+          alert(`Não foi possível processar a foto "${file.name}". Tente outra imagem.`);
         }
-      };
-      reader.readAsDataURL(file);
-    });
+      }
+    } finally {
+      setIsProcessingPhotos(false);
+    }
   };
 
   const removePhoto = (id: string) => {
@@ -98,10 +117,18 @@ export const Step1UploadPhotos: React.FC<Step1UploadProps> = ({ photos, setPhoto
           </div>
           <div>
             <p className="text-slate-200 font-medium text-base">Clique ou arraste suas fotos aqui</p>
-            <p className="text-slate-500 text-xs mt-1">Formatos suportados: JPG, PNG, WEBP (mínimo 3 fotos)</p>
+            <p className="text-slate-500 text-xs mt-1">
+              Formatos suportados: JPG, PNG, WEBP (mínimo 3 fotos, até {formatFileSizeMB(MAX_UPLOAD_FILE_SIZE_BYTES)}MB cada)
+            </p>
           </div>
         </div>
       </div>
+
+      {isProcessingPhotos && (
+        <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
+          <Loader2 className="w-4 h-4 animate-spin text-amber-400" /> Processando fotos...
+        </div>
+      )}
 
       {/* Photo List */}
       {photos.length > 0 && (
