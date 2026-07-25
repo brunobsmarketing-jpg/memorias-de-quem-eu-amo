@@ -54,12 +54,19 @@ export function saveVideoJob(video: VideoJob): VideoJob[] {
   } else {
     updated = [video, ...current];
   }
-  try {
-    localStorage.setItem(VIDEOS_STORAGE_KEY, JSON.stringify(updated));
-  } catch (e) {
-    // Cota do localStorage estourada (comum com fotos/imagens em base64) — o Supabase
-    // já é a fonte da verdade para o vídeo, então não deixamos isso quebrar o fluxo.
-    console.warn('Não foi possível salvar vídeos no localStorage (cota excedida?):', e);
+
+  // O Supabase já é a fonte da verdade — o localStorage aqui é só um cache rápido para a
+  // galeria local. Se a cota estourar (comum quando há vídeos antigos com fotos em base64
+  // sobrando de antes desta correção), tentamos progressivamente manter menos vídeos em vez
+  // de travar o fluxo do usuário.
+  const attempts = [updated, updated.slice(0, 5), [video]];
+  for (const attempt of attempts) {
+    try {
+      localStorage.setItem(VIDEOS_STORAGE_KEY, JSON.stringify(attempt));
+      return updated;
+    } catch (e) {
+      console.warn('Não foi possível salvar vídeos no localStorage (cota excedida?), tentando reduzir:', e);
+    }
   }
   return updated;
 }
