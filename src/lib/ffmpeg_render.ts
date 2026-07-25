@@ -20,7 +20,7 @@ if (ffmpegPath) {
 export interface RenderVideoParams {
   videoId: string;
   fatherName: string;
-  photos: string[]; // data URLs or file paths
+  photos: Array<string | { url: string }>; // data URLs, file paths, ou objetos PhotoItem do front-end
   aiImages?: { prompt: string; url: string }[];
   useAIImages?: boolean;
   tributeText: string;
@@ -165,7 +165,9 @@ export async function renderVideoWithFFmpeg(params: RenderVideoParams): Promise<
     return publicVideoUrl;
   }
 
-  const allImageUrls: string[] = [...params.photos];
+  // O front-end manda video.photos como objetos PhotoItem ({id, url, name, order}), não strings —
+  // normaliza aqui para aceitar tanto strings quanto objetos com .url.
+  const allImageUrls: string[] = params.photos.map((p: any) => (typeof p === 'string' ? p : p.url));
   if (params.useAIImages && params.aiImages && params.aiImages.length > 0) {
     params.aiImages.forEach((img) => allImageUrls.push(img.url));
   }
