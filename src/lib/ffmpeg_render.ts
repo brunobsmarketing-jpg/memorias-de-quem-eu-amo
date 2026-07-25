@@ -24,7 +24,9 @@ const FPS = 30;
 const MIN_DURATION = 20;
 const MAX_DURATION = 75;
 const NARRATION_TAIL_SECONDS = 1.5;
-const FONT_PATH = 'C:/Windows/Fonts/arial.ttf';
+// Fonte empacotada no próprio projeto (assets/fonts) em vez de um caminho do sistema operacional —
+// um caminho como "C:/Windows/Fonts/arial.ttf" não existiria no Linux do servidor de produção.
+const FONT_PATH = path.join(process.cwd(), 'assets', 'fonts', 'Poppins-Bold.ttf');
 
 function saveBase64ToTempFile(dataUrl: string, prefix: string, ext: string): string {
   const tempDir = path.join(process.cwd(), 'public', 'renders', 'temp');
