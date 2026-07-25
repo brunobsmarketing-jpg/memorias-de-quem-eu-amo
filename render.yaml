@@ -2,7 +2,7 @@ services:
   - type: web
     name: memorias-de-quem-eu-amo
     env: node
-    plan: starter
+    plan: free
     buildCommand: npm install && npm run build
     startCommand: npm start
     envVars:
