@@ -41,6 +41,13 @@ export interface PresetTrack {
   durationSeconds: number;
 }
 
+export interface AIImageStyle {
+  id: string;
+  label: string;
+  emoji: string;
+  description: string;
+}
+
 export interface AITextPromptData {
   fatherName: string;
   specialMemory: string;

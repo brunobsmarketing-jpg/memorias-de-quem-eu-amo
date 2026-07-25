@@ -403,16 +403,17 @@ DIRETRIZES DE ESTILO E CRIATIVIDADE (MUITO IMPORTANTE):
 // 2. Extract visual prompts for illustrative scenes
 app.post('/api/extract-visual-themes', async (req, res) => {
   try {
-    const { text, fatherName } = req.body;
+    const { text, fatherName, count } = req.body;
     if (!text) {
       return res.status(400).json({ error: 'Texto não fornecido' });
     }
+    const sceneCount = Math.max(1, Math.min(8, Number(count) || 2));
 
-    const prompt = `Analise o texto de homenagem de Dia dos Pais a seguir e extraia exatamente 2 cenas visuais e poéticas para ilustrações em estilo aquarela suave (soft watercolor painting).
+    const prompt = `Analise o texto de homenagem de Dia dos Pais a seguir e extraia exatamente ${sceneCount} cenas visuais e poéticas para ilustrações.
 
 Texto: "${text}"
 
-Retorne um JSON com a lista de 2 descrições visuais em inglês para geração de arte. As ilustrações NUNCA devem tentar simular fotos de pessoas reais específicas, mas sim conceitos simbólicos calorosos (ex: silhueta de pai e criança de mãos dadas ao pôr do sol, casa acolhedora com luz suave, árvore de carvalho forte simbolizando proteção).`;
+Retorne um JSON com a lista de ${sceneCount} descrições visuais em inglês para geração de arte, com cenas diferentes entre si. As ilustrações NUNCA devem tentar simular fotos de pessoas reais específicas, mas sim conceitos simbólicos calorosos (ex: silhueta de pai e criança de mãos dadas ao pôr do sol, casa acolhedora com luz suave, árvore de carvalho forte simbolizando proteção).`;
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
@@ -453,19 +454,34 @@ Retorne um JSON com a lista de 2 descrições visuais em inglês para geração 
   }
 });
 
+// Estilos de ilustração disponíveis para o usuário escolher no Passo 5 do wizard.
+const AI_IMAGE_STYLE_PROMPTS: Record<string, string> = {
+  watercolor: `Style: gentle handcrafted watercolor art, warm pastel tones, artistic and poetic, dreamlike quality.
+Colors: rich sunset oranges, warm golds, soft purples and deep blues for sky, earthy warm tones for ground.`,
+  realistic: `Style: photorealistic cinematic photography, soft natural lighting, warm color grading, shallow depth of field.
+Colors: warm golden-hour tones, soft natural light, gentle contrast.`,
+  'oil-painting': `Style: classical oil painting, rich visible brush strokes, textured canvas look, timeless fine-art quality.
+Colors: warm classical palette — deep ambers, burgundy, muted gold.`,
+  'flat-minimal': `Style: modern flat design illustration, clean simple vector shapes, minimalist composition, generous negative space.
+Colors: warm soft pastel palette with a few bold accent tones.`,
+  'sketch-bw': `Style: nostalgic hand-drawn pencil sketch, fine linework, tender and warm feeling.
+Colors: black and white with subtle warm sepia undertones.`,
+};
+
 // 3. Generate AI Illustration Image using OpenAI (gpt-image-1)
 app.post('/api/generate-ai-image', async (req, res) => {
   try {
-    const { prompt, titlePt } = req.body;
+    const { prompt, titlePt, style } = req.body;
     if (!prompt) {
       return res.status(400).json({ error: 'Prompt de imagem é obrigatório' });
     }
 
-    const fullPrompt = `Beautiful soft watercolor painting illustration for a Brazilian Father's Day (Dia dos Pais) tribute video.
-Style: gentle handcrafted watercolor art, warm pastel tones, artistic and poetic, dreamlike quality.
-Rules: NO realistic human faces, NO text or letters anywhere in the image, symbolic and metaphorical imagery only.
+    const styleBlock = AI_IMAGE_STYLE_PROMPTS[style as string] || AI_IMAGE_STYLE_PROMPTS.watercolor;
+
+    const fullPrompt = `Beautiful illustration for a Brazilian Father's Day (Dia dos Pais) tribute video.
+${styleBlock}
+Rules: NO realistic recognizable faces, NO text or letters anywhere in the image, symbolic and metaphorical imagery only.
 Mood: warm, nostalgic, heartfelt, loving, emotional.
-Colors: rich sunset oranges, warm golds, soft purples and deep blues for sky, earthy warm tones for ground.
 Scene theme: ${prompt}`;
 
     const response = await openai.images.generate({

@@ -17,9 +17,9 @@ import {
   Volume2,
 } from 'lucide-react';
 import { PhotoItem, AITextPromptData, PresetVoice, PresetTrack } from '../types';
-import { PRESET_VOICES, PRESET_TRACKS } from '../data/presets';
+import { PRESET_VOICES, PRESET_TRACKS, AI_IMAGE_STYLES } from '../data/presets';
 import { generateAITributeText } from '../lib/textgen';
-import { extractVisualThemesFromText, generateWatercolorCanvasImage, VisualTheme } from '../lib/imagegen';
+import { extractVisualThemesFromText, generateAIIllustrationImage, VisualTheme } from '../lib/imagegen';
 import { VoiceRecorder, synthesizeTTSNarration, cloneVoiceAndSynthesize } from '../lib/voice';
 import { resizeImageToDataUrl, MAX_UPLOAD_FILE_SIZE_BYTES, formatFileSizeMB } from '../lib/imageUtils';
 
@@ -27,10 +27,12 @@ import { resizeImageToDataUrl, MAX_UPLOAD_FILE_SIZE_BYTES, formatFileSizeMB } fr
 interface Step1UploadProps {
   photos: PhotoItem[];
   setPhotos: React.Dispatch<React.SetStateAction<PhotoItem[]>>;
+  aiOnlyMode: boolean;
+  setAiOnlyMode: (v: boolean) => void;
   onNext: () => void;
 }
 
-export const Step1UploadPhotos: React.FC<Step1UploadProps> = ({ photos, setPhotos, onNext }) => {
+export const Step1UploadPhotos: React.FC<Step1UploadProps> = ({ photos, setPhotos, aiOnlyMode, setAiOnlyMode, onNext }) => {
   const [isProcessingPhotos, setIsProcessingPhotos] = useState(false);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -102,36 +104,73 @@ export const Step1UploadPhotos: React.FC<Step1UploadProps> = ({ photos, setPhoto
         </p>
       </div>
 
-      {/* Upload Zone */}
-      <div className="border-2 border-dashed border-slate-700 hover:border-amber-500/60 bg-slate-900/60 transition-colors rounded-2xl p-8 text-center cursor-pointer relative group">
-        <input
-          type="file"
-          multiple
-          accept="image/*"
-          onChange={handleFileChange}
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-        />
-        <div className="flex flex-col items-center justify-center space-y-3">
-          <div className="w-14 h-14 rounded-full bg-amber-500/10 text-amber-400 flex items-center justify-center group-hover:scale-110 transition-transform">
-            <Upload className="w-7 h-7" />
-          </div>
-          <div>
-            <p className="text-slate-200 font-medium text-base">Clique ou arraste suas fotos aqui</p>
-            <p className="text-slate-500 text-xs mt-1">
-              Formatos suportados: JPG, PNG, WEBP (mínimo 3 fotos, até {formatFileSizeMB(MAX_UPLOAD_FILE_SIZE_BYTES)}MB cada)
-            </p>
-          </div>
+      {/* Escolha: tenho fotos vs. quero criar só com ilustrações de IA */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl mx-auto">
+        <div
+          onClick={() => setAiOnlyMode(false)}
+          className={`p-4 rounded-2xl border cursor-pointer transition-all text-center ${
+            !aiOnlyMode
+              ? 'bg-amber-500/10 border-amber-500 ring-1 ring-amber-500'
+              : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+          }`}
+        >
+          <h4 className="font-bold text-slate-100 text-sm">Tenho fotos do meu pai</h4>
+          <p className="text-xs text-slate-400 mt-1">Enviar de 3 a 8 fotos reais</p>
+        </div>
+        <div
+          onClick={() => setAiOnlyMode(true)}
+          className={`p-4 rounded-2xl border cursor-pointer transition-all text-center ${
+            aiOnlyMode
+              ? 'bg-amber-500/10 border-amber-500 ring-1 ring-amber-500'
+              : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+          }`}
+        >
+          <h4 className="font-bold text-slate-100 text-sm flex items-center justify-center gap-1.5">
+            <Sparkles className="w-4 h-4 text-amber-400" /> Não tenho fotos boas
+          </h4>
+          <p className="text-xs text-slate-400 mt-1">Criar o vídeo só com ilustrações de IA</p>
         </div>
       </div>
 
-      {isProcessingPhotos && (
-        <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
-          <Loader2 className="w-4 h-4 animate-spin text-amber-400" /> Processando fotos...
+      {aiOnlyMode ? (
+        <div className="max-w-xl mx-auto p-5 bg-slate-900/60 border border-slate-800 rounded-2xl text-center space-y-1">
+          <p className="text-slate-200 text-sm font-medium">Sem problema! Você vai escolher o estilo e gerar as ilustrações no Passo 5.</p>
+          <p className="text-slate-500 text-xs">Não precisa enviar nenhuma foto agora — pode avançar direto.</p>
         </div>
+      ) : (
+        <>
+          {/* Upload Zone */}
+          <div className="border-2 border-dashed border-slate-700 hover:border-amber-500/60 bg-slate-900/60 transition-colors rounded-2xl p-8 text-center cursor-pointer relative group">
+            <input
+              type="file"
+              multiple
+              accept="image/*"
+              onChange={handleFileChange}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+            />
+            <div className="flex flex-col items-center justify-center space-y-3">
+              <div className="w-14 h-14 rounded-full bg-amber-500/10 text-amber-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Upload className="w-7 h-7" />
+              </div>
+              <div>
+                <p className="text-slate-200 font-medium text-base">Clique ou arraste suas fotos aqui</p>
+                <p className="text-slate-500 text-xs mt-1">
+                  Formatos suportados: JPG, PNG, WEBP (mínimo 3 fotos, até {formatFileSizeMB(MAX_UPLOAD_FILE_SIZE_BYTES)}MB cada)
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {isProcessingPhotos && (
+            <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
+              <Loader2 className="w-4 h-4 animate-spin text-amber-400" /> Processando fotos...
+            </div>
+          )}
+        </>
       )}
 
       {/* Photo List */}
-      {photos.length > 0 && (
+      {!aiOnlyMode && photos.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center justify-between text-xs font-semibold text-slate-400 uppercase tracking-wider px-1">
             <span>{photos.length} foto(s) selecionada(s)</span>
@@ -184,10 +223,12 @@ export const Step1UploadPhotos: React.FC<Step1UploadProps> = ({ photos, setPhoto
       <div className="flex justify-end pt-4">
         <button
           onClick={onNext}
-          disabled={photos.length < 3}
+          disabled={!aiOnlyMode && photos.length < 3}
           className="px-6 py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 font-bold rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-2"
         >
-          Próximo Passo: Texto da Homenagem ({photos.length}/3 fotos)
+          {aiOnlyMode
+            ? 'Próximo Passo: Texto da Homenagem'
+            : `Próximo Passo: Texto da Homenagem (${photos.length}/3 fotos)`}
         </button>
       </div>
     </div>
@@ -415,6 +456,8 @@ interface Step3VoiceProps {
   setIsCustomVoice: (v: boolean) => void;
   customVoiceAudioUrl: string;
   setCustomVoiceAudioUrl: (url: string) => void;
+  skipNarration: boolean;
+  setSkipNarration: (v: boolean) => void;
   tributeText: string;
   onNext: () => void;
   onBack: () => void;
@@ -427,6 +470,8 @@ export const Step3NarrationVoice: React.FC<Step3VoiceProps> = ({
   setIsCustomVoice,
   customVoiceAudioUrl,
   setCustomVoiceAudioUrl,
+  skipNarration,
+  setSkipNarration,
   tributeText,
   onNext,
   onBack,
@@ -503,11 +548,14 @@ export const Step3NarrationVoice: React.FC<Step3VoiceProps> = ({
       </div>
 
       {/* Voice Mode Choice */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div
-          onClick={() => setIsCustomVoice(false)}
+          onClick={() => {
+            setSkipNarration(false);
+            setIsCustomVoice(false);
+          }}
           className={`p-5 rounded-2xl border cursor-pointer transition-all ${
-            !isCustomVoice
+            !skipNarration && !isCustomVoice
               ? 'bg-amber-500/10 border-amber-500 shadow-lg ring-1 ring-amber-500'
               : 'bg-slate-900 border-slate-800 hover:border-slate-700'
           }`}
@@ -524,9 +572,12 @@ export const Step3NarrationVoice: React.FC<Step3VoiceProps> = ({
         </div>
 
         <div
-          onClick={() => setIsCustomVoice(true)}
+          onClick={() => {
+            setSkipNarration(false);
+            setIsCustomVoice(true);
+          }}
           className={`p-5 rounded-2xl border cursor-pointer transition-all ${
-            isCustomVoice
+            !skipNarration && isCustomVoice
               ? 'bg-amber-500/10 border-amber-500 shadow-lg ring-1 ring-amber-500'
               : 'bg-slate-900 border-slate-800 hover:border-slate-700'
           }`}
@@ -541,10 +592,38 @@ export const Step3NarrationVoice: React.FC<Step3VoiceProps> = ({
             </div>
           </div>
         </div>
+
+        <div
+          onClick={() => {
+            setSkipNarration(true);
+            setCustomVoiceAudioUrl('');
+          }}
+          className={`p-5 rounded-2xl border cursor-pointer transition-all ${
+            skipNarration
+              ? 'bg-amber-500/10 border-amber-500 shadow-lg ring-1 ring-amber-500'
+              : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-slate-700/50 text-slate-300 rounded-xl">
+              <Music className="w-6 h-6" />
+            </div>
+            <div>
+              <h4 className="font-bold text-slate-100 text-sm">Sem Narração Falada</h4>
+              <p className="text-xs text-slate-400 mt-0.5">Só música de fundo e legendas</p>
+            </div>
+          </div>
+        </div>
       </div>
 
+      {skipNarration && (
+        <div className="max-w-xl mx-auto p-5 bg-slate-900/60 border border-slate-800 rounded-2xl text-center space-y-1">
+          <p className="text-slate-200 text-sm font-medium">Combinado! O vídeo vai ter só a música de fundo e as legendas com o seu texto.</p>
+        </div>
+      )}
+
       {/* Mode A: Preset Voices */}
-      {!isCustomVoice && (
+      {!skipNarration && !isCustomVoice && (
         <div className="space-y-3 bg-slate-900/60 p-5 rounded-2xl border border-slate-800">
           <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
             Selecione uma voz do banco
@@ -582,7 +661,7 @@ export const Step3NarrationVoice: React.FC<Step3VoiceProps> = ({
       )}
 
       {/* Mode B: Voice Recorder */}
-      {isCustomVoice && (
+      {!skipNarration && isCustomVoice && (
         <div className="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 text-center space-y-4">
           <div className="max-w-md mx-auto space-y-2">
             <p className="text-slate-300 text-sm">
@@ -764,6 +843,9 @@ interface Step5AIImagesProps {
   setAiImages: React.Dispatch<React.SetStateAction<{ prompt: string; url: string }[]>>;
   tributeText: string;
   fatherName: string;
+  aiOnlyMode: boolean;
+  selectedImageStyle: string;
+  setSelectedImageStyle: (id: string) => void;
   onNext: () => void;
   onBack: () => void;
   isSubmitting?: boolean;
@@ -776,24 +858,28 @@ export const Step5AIImagesOption: React.FC<Step5AIImagesProps> = ({
   setAiImages,
   tributeText,
   fatherName,
+  aiOnlyMode,
+  selectedImageStyle,
+  setSelectedImageStyle,
   onNext,
   onBack,
   isSubmitting = false,
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatingProgress, setGeneratingProgress] = useState(0);
+  const imageCount = aiOnlyMode ? 5 : 2;
 
   const handleGenerateAIImages = async () => {
     setIsGenerating(true);
     setUseAIImages(true);
     setGeneratingProgress(0);
     try {
-      const themes = await extractVisualThemesFromText(tributeText, fatherName);
+      const themes = await extractVisualThemesFromText(tributeText, fatherName, imageCount);
       setGeneratingProgress(1); // temas extraídos
 
       const generatedList = await Promise.all(
         themes.map(async (t) => {
-          const url = await generateWatercolorCanvasImage(t.titlePt, t.promptEn);
+          const url = await generateAIIllustrationImage(t.titlePt, t.promptEn, selectedImageStyle);
           setGeneratingProgress((prev) => prev + 1);
           return { prompt: t.titlePt, url };
         })
@@ -807,35 +893,65 @@ export const Step5AIImagesOption: React.FC<Step5AIImagesProps> = ({
     }
   };
 
+  const canProceed = aiOnlyMode ? aiImages.length >= 3 && !isGenerating : !isGenerating;
+
   return (
     <div className="space-y-6">
       <div className="text-center max-w-xl mx-auto space-y-2">
         <h3 className="text-2xl font-bold text-slate-100 flex items-center justify-center gap-2">
-          <ImageIcon className="w-6 h-6 text-amber-400" /> Passo 5: Complemento Artístico IA
+          <ImageIcon className="w-6 h-6 text-amber-400" /> Passo 5: {aiOnlyMode ? 'Ilustrações com IA' : 'Complemento Artístico IA'}
         </h3>
         <p className="text-slate-400 text-sm">
-          Deseja complementar o vídeo intercalando fotos reais com ilustrações conceituais em estilo aquarela suave?
+          {aiOnlyMode
+            ? 'Escolha o estilo artístico e a IA vai criar as ilustrações que formarão o seu vídeo.'
+            : 'Deseja complementar o vídeo intercalando fotos reais com ilustrações conceituais geradas por IA?'}
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* NO Option */}
-        <div
-          onClick={() => {
-            setUseAIImages(false);
-            setAiImages([]);
-          }}
-          className={`p-6 rounded-2xl border cursor-pointer transition-all ${
-            !useAIImages
-              ? 'bg-amber-500/10 border-amber-500 shadow-lg ring-1 ring-amber-500'
-              : 'bg-slate-900 border-slate-800 hover:border-slate-700'
-          }`}
-        >
-          <h4 className="font-bold text-slate-100 text-base mb-1">NÃO, usar apenas fotos reais</h4>
-          <p className="text-xs text-slate-400 leading-relaxed">
-            O slideshow exibirá exclusivamente as {3} ou mais fotos reais que você enviou.
-          </p>
+      {/* Style Picker */}
+      <div className="space-y-2">
+        <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider text-center">
+          Estilo da Ilustração
+        </h4>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+          {AI_IMAGE_STYLES.map((style) => (
+            <div
+              key={style.id}
+              onClick={() => setSelectedImageStyle(style.id)}
+              className={`p-3 rounded-xl border cursor-pointer text-center transition-all ${
+                selectedImageStyle === style.id
+                  ? 'bg-amber-500/20 border-amber-500 ring-1 ring-amber-500'
+                  : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+              }`}
+            >
+              <div className="text-xl">{style.emoji}</div>
+              <h5 className="font-bold text-slate-100 text-[11px] mt-1">{style.label}</h5>
+              <p className="text-[10px] text-slate-500 mt-0.5 leading-tight hidden sm:block">{style.description}</p>
+            </div>
+          ))}
         </div>
+      </div>
+
+      <div className={`grid grid-cols-1 ${aiOnlyMode ? '' : 'sm:grid-cols-2'} gap-4`}>
+        {/* NO Option — escondida no modo só-IA, já que fotos reais não existem */}
+        {!aiOnlyMode && (
+          <div
+            onClick={() => {
+              setUseAIImages(false);
+              setAiImages([]);
+            }}
+            className={`p-6 rounded-2xl border cursor-pointer transition-all ${
+              !useAIImages
+                ? 'bg-amber-500/10 border-amber-500 shadow-lg ring-1 ring-amber-500'
+                : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+            }`}
+          >
+            <h4 className="font-bold text-slate-100 text-base mb-1">NÃO, usar apenas fotos reais</h4>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              O slideshow exibirá exclusivamente as fotos reais que você enviou.
+            </p>
+          </div>
+        )}
 
         {/* YES Option */}
         <div
@@ -848,10 +964,12 @@ export const Step5AIImagesOption: React.FC<Step5AIImagesProps> = ({
         >
           <div className="flex items-center gap-2 mb-1">
             <Sparkles className="w-5 h-5 text-amber-400" />
-            <h4 className="font-bold text-slate-100 text-base">SIM, gerar ilustrações com IA</h4>
+            <h4 className="font-bold text-slate-100 text-base">
+              {aiOnlyMode ? 'Gerar Ilustrações com IA' : 'SIM, gerar ilustrações com IA'}
+            </h4>
           </div>
           <p className="text-xs text-slate-400 leading-relaxed">
-            A IA analisará seu texto e criará 2 artes poéticas em aquarela para enriquecer a experiência visual.
+            A IA analisará seu texto e criará {imageCount} artes no estilo escolhido{aiOnlyMode ? ' para formar o seu vídeo' : ' para enriquecer a experiência visual'}.
           </p>
         </div>
       </div>
@@ -911,7 +1029,8 @@ export const Step5AIImagesOption: React.FC<Step5AIImagesProps> = ({
         </button>
         <button
           onClick={onNext}
-          disabled={isSubmitting}
+          disabled={isSubmitting || !canProceed}
+          title={aiOnlyMode && aiImages.length < 3 ? 'Gere pelo menos 3 ilustrações para continuar' : undefined}
           className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-50 text-slate-950 font-bold rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-2"
         >
           {isSubmitting ? (

@@ -3,12 +3,39 @@ export interface VisualTheme {
   promptEn: string;
 }
 
-export async function extractVisualThemesFromText(text: string, fatherName: string): Promise<VisualTheme[]> {
+const FALLBACK_THEMES: VisualTheme[] = [
+  {
+    titlePt: 'Silhueta de Pai e Filho ao Pôr do Sol',
+    promptEn: 'Warm sunset silhouette of loving father and child holding hands',
+  },
+  {
+    titlePt: 'Abraço Acolhedor em Família',
+    promptEn: 'Warm emotional family embrace, gentle pastel lighting',
+  },
+  {
+    titlePt: 'Árvore Forte de Proteção',
+    promptEn: 'A strong sheltering oak tree symbolizing protection and guidance',
+  },
+  {
+    titlePt: 'Casa Acolhedora com Luz Suave',
+    promptEn: 'A cozy warmly lit home at dusk, symbol of family and belonging',
+  },
+  {
+    titlePt: 'Coração e Mãos Entrelaçadas',
+    promptEn: 'Two hands intertwined gently forming a heart shape, warm symbolic imagery',
+  },
+];
+
+export async function extractVisualThemesFromText(
+  text: string,
+  fatherName: string,
+  count: number = 2
+): Promise<VisualTheme[]> {
   try {
     const response = await fetch('/api/extract-visual-themes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, fatherName }),
+      body: JSON.stringify({ text, fatherName, count }),
     });
 
     if (!response.ok) {
@@ -19,30 +46,25 @@ export async function extractVisualThemesFromText(text: string, fatherName: stri
     return data.scenes || [];
   } catch (e) {
     console.error('Erro na extração de temas:', e);
-    return [
-      {
-        titlePt: 'Silhueta de Pai e Filho ao Pôr do Sol',
-        promptEn: 'Warm sunset silhouette of loving father and child holding hands, soft watercolor style',
-      },
-      {
-        titlePt: 'Abraço Acolhedor em Família',
-        promptEn: 'Warm emotional family embrace, gentle pastel lighting, watercolor artistic painting',
-      },
-    ];
+    return FALLBACK_THEMES.slice(0, count);
   }
 }
 
 /**
- * Gera uma ilustração artística em aquarela usando a API de geração de imagem da OpenAI.
- * Retorna uma data URL (base64) da imagem gerada.
- * Em caso de falha, usa um canvas local como fallback.
+ * Gera uma ilustração artística usando a API de geração de imagem da OpenAI, no estilo escolhido
+ * pelo usuário (aquarela, realista, pintura a óleo, etc.). Retorna uma data URL (base64) da
+ * imagem gerada. Em caso de falha, usa um canvas local como fallback.
  */
-export async function generateWatercolorCanvasImage(title: string, themePrompt: string): Promise<string> {
+export async function generateAIIllustrationImage(
+  title: string,
+  themePrompt: string,
+  style: string = 'watercolor'
+): Promise<string> {
   try {
     const response = await fetch('/api/generate-ai-image', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: themePrompt, titlePt: title }),
+      body: JSON.stringify({ prompt: themePrompt, titlePt: title, style }),
     });
 
     if (!response.ok) {

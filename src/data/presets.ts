@@ -1,4 +1,37 @@
-import { PresetVoice, PresetTrack, CreditPackage } from '../types';
+import { PresetVoice, PresetTrack, CreditPackage, AIImageStyle } from '../types';
+
+export const AI_IMAGE_STYLES: AIImageStyle[] = [
+  {
+    id: 'watercolor',
+    label: 'Aquarela Suave',
+    emoji: '🎨',
+    description: 'Pintura em aquarela delicada, tons pastéis quentes',
+  },
+  {
+    id: 'realistic',
+    label: 'Realista Cinematográfico',
+    emoji: '🎬',
+    description: 'Estilo fotográfico, iluminação suave e cinematográfica',
+  },
+  {
+    id: 'oil-painting',
+    label: 'Pintura a Óleo Clássica',
+    emoji: '🖼️',
+    description: 'Pinceladas ricas, paleta clássica e atemporal',
+  },
+  {
+    id: 'flat-minimal',
+    label: 'Minimalista Moderno',
+    emoji: '✨',
+    description: 'Formas planas e limpas, visual moderno e simples',
+  },
+  {
+    id: 'sketch-bw',
+    label: 'Esboço Nostálgico P&B',
+    emoji: '✏️',
+    description: 'Desenho a lápis, tons de preto e branco/sépia',
+  },
+];
 
 // Vozes com sotaque brasileiro (melhor pra narrar português do que as vozes em inglês
 // americano usadas antes) — IDs reais da nossa conta ElevenLabs, confirmados via API.

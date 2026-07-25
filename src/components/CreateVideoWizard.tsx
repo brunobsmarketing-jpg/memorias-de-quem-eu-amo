@@ -31,15 +31,18 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
 
   // Form States
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
+  const [aiOnlyMode, setAiOnlyMode] = useState<boolean>(false);
   const [fatherName, setFatherName] = useState<string>('');
   const [authorName, setAuthorName] = useState<string>(user.name || '');
   const [tributeText, setTributeText] = useState<string>('');
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>(PRESET_VOICES[0].id);
   const [isCustomVoice, setIsCustomVoice] = useState<boolean>(false);
   const [customVoiceAudioUrl, setCustomVoiceAudioUrl] = useState<string>('');
+  const [skipNarration, setSkipNarration] = useState<boolean>(false);
   const [selectedTrackId, setSelectedTrackId] = useState<string>(PRESET_TRACKS[0].id);
   const [useAIImages, setUseAIImages] = useState<boolean>(false);
   const [aiImages, setAiImages] = useState<{ prompt: string; url: string }[]>([]);
+  const [selectedImageStyle, setSelectedImageStyle] = useState<string>('watercolor');
 
   // Created Draft Job
   const [createdJob, setCreatedJob] = useState<VideoJob | null>(null);
@@ -71,8 +74,9 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
     const videoId = `vid_${Date.now()}`;
     const cardUrl = `${window.location.origin}/c/${videoId}`;
 
-    // Garante que há pelo menos fotos válidas para exibição no player
-    const validPhotos = photos.length >= 3 ? photos : [
+    // No modo "só IA" o vídeo é feito inteiramente das ilustrações geradas, sem fotos reais.
+    // Nos demais casos, garante que há pelo menos fotos válidas para exibição no player.
+    const validPhotos = aiOnlyMode || photos.length >= 3 ? photos : [
       { id: '1', url: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=800&auto=format&fit=crop', name: 'Foto 1', order: 1 },
       { id: '2', url: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=800&auto=format&fit=crop', name: 'Foto 2', order: 2 },
       { id: '3', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop', name: 'Foto 3', order: 3 },
@@ -87,7 +91,7 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
       tributeText: tributeText || 'Pai, obrigado por cada conselho, cada abraço e cada momento de carinho.',
       selectedVoiceId,
       isCustomVoice,
-      customVoiceAudioUrl,
+      customVoiceAudioUrl: skipNarration ? '' : customVoiceAudioUrl,
       selectedTrackId,
       useAIImages,
       aiGeneratedImages: aiImages,
@@ -168,6 +172,8 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
           <Step1UploadPhotos
             photos={photos}
             setPhotos={setPhotos}
+            aiOnlyMode={aiOnlyMode}
+            setAiOnlyMode={setAiOnlyMode}
             onNext={() => setCurrentStep(2)}
           />
         )}
@@ -193,6 +199,8 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
             setIsCustomVoice={setIsCustomVoice}
             customVoiceAudioUrl={customVoiceAudioUrl}
             setCustomVoiceAudioUrl={setCustomVoiceAudioUrl}
+            skipNarration={skipNarration}
+            setSkipNarration={setSkipNarration}
             tributeText={tributeText}
             onNext={() => setCurrentStep(4)}
             onBack={() => setCurrentStep(2)}
@@ -216,6 +224,9 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
             setAiImages={setAiImages}
             tributeText={tributeText}
             fatherName={fatherName}
+            aiOnlyMode={aiOnlyMode}
+            selectedImageStyle={selectedImageStyle}
+            setSelectedImageStyle={setSelectedImageStyle}
             onNext={handleGeneratePreviewJob}
             onBack={() => setCurrentStep(4)}
             isSubmitting={isGeneratingJob}
