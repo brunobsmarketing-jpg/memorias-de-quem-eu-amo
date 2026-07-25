@@ -33,7 +33,7 @@ export async function extractVisualThemesFromText(text: string, fatherName: stri
 }
 
 /**
- * Gera uma ilustração artística em aquarela usando a API Gemini (gemini-2.0-flash-preview-image-generation).
+ * Gera uma ilustração artística em aquarela usando a API de geração de imagem da OpenAI.
  * Retorna uma data URL (base64) da imagem gerada.
  * Em caso de falha, usa um canvas local como fallback.
  */
@@ -57,7 +57,7 @@ export async function generateWatercolorCanvasImage(title: string, themePrompt: 
 
     return data.imageDataUrl;
   } catch (e) {
-    console.warn('Gemini image API falhou, usando fallback canvas:', e);
+    console.warn('API de geração de imagem falhou, usando fallback canvas:', e);
     return generateCanvasFallback(title, themePrompt);
   }
 }

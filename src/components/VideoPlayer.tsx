@@ -315,7 +315,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
           className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-semibold text-sm rounded-xl border border-slate-700 flex items-center justify-center gap-2 transition-all active:scale-98 shadow-md"
         >
           <Download className="w-4 h-4 text-amber-400" />
-          {isRecordingExport ? 'Renderizando MP4 com FFmpeg...' : 'Baixar Vídeo em HD (.MP4)'}
+          {isRecordingExport ? 'Renderizando vídeo em HD...' : 'Baixar Vídeo em HD (.MP4)'}
         </button>
       </div>
     </div>

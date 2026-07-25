@@ -500,6 +500,47 @@ Scene theme: ${prompt}`;
   }
 });
 
+// Gera o fundo ilustrado do cartão digital imprimível — paleta de azuis vivos (diferente do
+// tom laranja/pôr do sol usado nas ilustrações do vídeo), sem texto (o texto é desenhado
+// depois, por cima, no canvas do cliente).
+app.post('/api/generate-card-background', async (req, res) => {
+  try {
+    const cardPrompt = `Elegant vertical greeting card background illustration for a Brazilian Father's Day (Dia dos Pais) tribute card.
+Style: modern flat illustration with soft gradients, festive and warm, clean vector-like shapes with gentle texture.
+Rules: NO text, NO letters, NO words, NO human faces anywhere in the image — purely decorative background and symbolic imagery.
+Palette: vivid blues throughout — baby blue, sky blue, royal blue and deep navy in a smooth gradient, with soft white and light gold accents.
+Composition: decorative border elements, small warm symbolic accents (hearts, stars, gentle sun rays or ribbon shapes) framing empty open space in the center and bottom for text and a QR code to be added later.
+Mood: celebratory, warm, loving, elegant.`;
+
+    const response = await openai.images.generate({
+      model: 'gpt-image-1',
+      prompt: cardPrompt,
+      n: 1,
+      size: '1024x1536',
+    });
+
+    const b64Image = response.data?.[0]?.b64_json;
+    const imageUrl = response.data?.[0]?.url;
+
+    let finalDataUrl = '';
+    if (b64Image) {
+      finalDataUrl = `data:image/png;base64,${b64Image}`;
+    } else if (imageUrl) {
+      const imgFetch = await fetch(imageUrl);
+      const arrayBuf = await imgFetch.arrayBuffer();
+      const b64 = Buffer.from(arrayBuf).toString('base64');
+      finalDataUrl = `data:image/png;base64,${b64}`;
+    } else {
+      throw new Error('Nenhuma imagem foi retornada pela OpenAI.');
+    }
+
+    res.json({ imageDataUrl: finalDataUrl });
+  } catch (error: any) {
+    console.error('Erro ao gerar fundo do cartão:', error);
+    res.status(500).json({ error: 'Falha ao gerar fundo do cartão', details: error.message });
+  }
+});
+
 
 // 4. Generate TTS Narration using ElevenLabs (multilingual v2)
 app.post('/api/generate-narration-tts', async (req, res) => {

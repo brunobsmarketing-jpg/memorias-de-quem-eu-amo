@@ -277,7 +277,7 @@ export default function App() {
         <p className="font-medium text-slate-400">
           Memórias de Quem Eu Amo © 2026 — Plataforma Exclusiva de Homenagens
         </p>
-        <p>Acesso exclusivo para membros pagantes com gerador poético Gemini AI, gravação de voz e cartões interativos.</p>
+        <p>Acesso exclusivo para membros pagantes com gerador poético por IA, gravação de voz e cartões interativos.</p>
       </footer>
     </div>
   );

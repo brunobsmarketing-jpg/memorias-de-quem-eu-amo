@@ -253,7 +253,7 @@ export const Step2TextTribute: React.FC<Step2TextProps> = ({
           <Heart className="w-6 h-6 text-rose-400 fill-rose-500/20" /> Passo 2: Mensagem do Coração
         </h3>
         <p className="text-slate-400 text-sm">
-          Escreva seu próprio texto de carinho ou use nosso assistente de IA com Gemini para criar uma homenagem poética inesquecível.
+          Escreva seu próprio texto de carinho ou use nosso assistente de IA para criar uma homenagem poética inesquecível.
         </p>
       </div>
 
@@ -575,7 +575,7 @@ export const Step3NarrationVoice: React.FC<Step3VoiceProps> = ({
 
           {isGeneratingTTS && (
             <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-500/30 flex items-center gap-2 text-xs text-amber-300">
-              <Loader2 className="w-4 h-4 animate-spin" /> Gerando narração em alta qualidade com ElevenLabs...
+              <Loader2 className="w-4 h-4 animate-spin" /> Gerando narração em alta qualidade...
             </div>
           )}
         </div>
@@ -632,7 +632,7 @@ export const Step3NarrationVoice: React.FC<Step3VoiceProps> = ({
           {isCloningVoice && (
             <div className="p-5 bg-rose-500/10 rounded-xl border border-rose-500/30 text-center space-y-2">
               <Loader2 className="w-6 h-6 text-rose-400 animate-spin mx-auto" />
-              <p className="text-sm font-medium text-slate-200">Clonando sua voz com ElevenLabs AI...</p>
+              <p className="text-sm font-medium text-slate-200">Clonando sua voz com IA...</p>
               <p className="text-xs text-slate-500">Isso pode levar 20 a 40 segundos</p>
             </div>
           )}
@@ -864,11 +864,11 @@ export const Step5AIImagesOption: React.FC<Step5AIImagesProps> = ({
               {generatingProgress === 0
                 ? '🔍 Analisando o texto da homenagem...'
                 : generatingProgress === 1
-                ? '🎨 Gemini IA está pintando as ilustrações em aquarela...'
+                ? '🎨 Nossa IA está pintando as ilustrações em aquarela...'
                 : `✅ Ilustração ${generatingProgress - 1} gerada! Finalizando...`}
             </p>
             <p className="text-xs text-slate-500">
-              Geração de imagem real com Gemini AI — pode levar alguns segundos
+              Geração de imagem real por IA — pode levar alguns segundos
             </p>
           </div>
           {/* Progress dots */}
