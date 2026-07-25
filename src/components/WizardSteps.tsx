@@ -657,6 +657,15 @@ export const Step3NarrationVoice: React.FC<Step3VoiceProps> = ({
               <Loader2 className="w-4 h-4 animate-spin" /> Gerando narração em alta qualidade...
             </div>
           )}
+
+          {!isGeneratingTTS && previewAudioUrl && (
+            <div className="p-4 bg-slate-800/80 rounded-xl border border-slate-700 space-y-2">
+              <p className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                <Volume2 className="w-3.5 h-3.5 text-amber-400" /> Ouça a narração com o seu texto (a mesma que vai no vídeo):
+              </p>
+              <audio key={previewAudioUrl} src={previewAudioUrl} controls className="w-full h-10 rounded-lg" />
+            </div>
+          )}
         </div>
       )}
 
