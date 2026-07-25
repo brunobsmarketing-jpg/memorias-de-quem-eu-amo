@@ -32,40 +32,23 @@ export const PRESET_VOICES: PresetVoice[] = [
 ];
 
 
+// IMPORTANTE: os áudios ficam hospedados no nosso próprio Supabase Storage (pasta "tracks/"),
+// não mais hotlinkados direto do Pixabay — 3 dos 5 links originais do Pixabay expiraram (HTTP 403)
+// e quebravam o áudio do vídeo final silenciosamente. Ver PRESET_TRACKS_TODO.md para repor as
+// faixas que faltam.
 export const PRESET_TRACKS: PresetTrack[] = [
   {
     id: 'track-piano',
     title: 'Piano Suave de Família',
     category: 'Piano Emocionante',
-    audioUrl: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=emotional-piano-112691.mp3',
-    durationSeconds: 60,
-  },
-  {
-    id: 'track-acoustic',
-    title: 'Violão Acolhedor de Tarde',
-    category: 'Acústico Nostálgico',
-    audioUrl: 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8c823058f.mp3?filename=acoustic-guitars-ambient-10700.mp3',
+    audioUrl: 'https://jshdugdrqneuikrlwrum.supabase.co/storage/v1/object/public/media/tracks/track-piano.mp3',
     durationSeconds: 60,
   },
   {
     id: 'track-orchestral',
     title: 'Amor Incondicional (Orquestral)',
     category: 'Orquestral Leve',
-    audioUrl: 'https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3?filename=inspiring-emotional-piano-10103.mp3',
-    durationSeconds: 60,
-  },
-  {
-    id: 'track-serene',
-    title: 'Lembranças Especiais',
-    category: 'Inspiração Serena',
-    audioUrl: 'https://cdn.pixabay.com/download/audio/2023/04/10/audio_515902bfbf.mp3?filename=emotional-inspiring-piano-145455.mp3',
-    durationSeconds: 60,
-  },
-  {
-    id: 'track-father',
-    title: 'Exemplo de Vida (Sinfonia Suave)',
-    category: 'Cinematográfico Emocional',
-    audioUrl: 'https://cdn.pixabay.com/download/audio/2022/10/14/audio_9939fd9e06.mp3?filename=hopeful-emotional-piano-124923.mp3',
+    audioUrl: 'https://jshdugdrqneuikrlwrum.supabase.co/storage/v1/object/public/media/tracks/track-orchestral.mp3',
     durationSeconds: 60,
   },
 ];
