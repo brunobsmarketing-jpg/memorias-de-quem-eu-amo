@@ -19,6 +19,59 @@ app.use('/renders', express.static(rendersPath));
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
+/**
+ * Fila de renderização de vídeo — o FFmpeg é pesado em CPU/memória, e o servidor roda em
+ * um plano com pouca RAM (ver render.yaml). Sem isso, duas pessoas gerando vídeo ao mesmo
+ * tempo derrubariam o processo inteiro (OOM) para todo mundo, não só para quem gerou.
+ * Limita quantas renderizações rodam de verdade ao mesmo tempo; o resto espera na fila em
+ * vez de competir por memória. Ajustável via RENDER_CONCURRENCY sem precisar mudar código
+ * (ex: depois de migrar para um plano com mais RAM).
+ */
+class RenderQueue {
+  private readonly maxConcurrent: number;
+  private active = 0;
+  private waiting: Array<() => void> = [];
+
+  constructor(maxConcurrent: number) {
+    this.maxConcurrent = Math.max(1, maxConcurrent);
+  }
+
+  get position(): number {
+    return this.waiting.length;
+  }
+
+  async run<T>(task: () => Promise<T>): Promise<T> {
+    await this.acquire();
+    try {
+      return await task();
+    } finally {
+      this.release();
+    }
+  }
+
+  private acquire(): Promise<void> {
+    if (this.active < this.maxConcurrent) {
+      this.active++;
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      this.waiting.push(() => {
+        this.active++;
+        resolve();
+      });
+    });
+  }
+
+  private release(): void {
+    this.active--;
+    const next = this.waiting.shift();
+    if (next) next();
+  }
+}
+
+const RENDER_CONCURRENCY = process.env.RENDER_CONCURRENCY ? parseInt(process.env.RENDER_CONCURRENCY, 10) : 1;
+const renderQueue = new RenderQueue(RENDER_CONCURRENCY);
+
 // ElevenLabs configuration
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || '';
 const ELEVENLABS_BASE_URL = 'https://api.elevenlabs.io/v1';
@@ -743,26 +796,40 @@ app.post('/api/clone-voice', async (req, res) => {
 });
 
 // 6. Server-Side FFmpeg Video Rendering Endpoint
+// Responde imediatamente (202) com o vídeo entrando na fila de renderização, e processa o
+// FFmpeg + upload em segundo plano — o cliente acompanha o progresso via GET /api/videos/:id
+// (poll até "unlockedVideoUrl" aparecer). Isso evita manter uma conexão HTTP aberta por
+// minutos quando há fila (ver RenderQueue acima), o que arriscaria timeout no proxy em
+// picos de tráfego.
 app.post('/api/render-video', async (req, res) => {
+  const { videoId, fatherName, photos, aiImages, useAIImages, tributeText, narrationAudioDataUrl, selectedTrackId } = req.body;
+
+  if (!photos || photos.length === 0) {
+    return res.status(400).json({ error: 'Fotos são obrigatórias para renderizar o vídeo.' });
+  }
+
+  const finalVideoId = videoId || `vid_${Date.now()}`;
+  const queuePosition = renderQueue.position;
+  res.status(202).json({ queued: true, videoId: finalVideoId, position: queuePosition });
+
+  if (queuePosition > 0) {
+    console.log(`⏳ Vídeo ${finalVideoId} entrou na fila de renderização (${queuePosition} na frente).`);
+  }
+
   try {
-    const { renderVideoWithFFmpeg } = await import('./src/lib/ffmpeg_render.js');
-    const { videoId, fatherName, photos, aiImages, useAIImages, tributeText, narrationAudioDataUrl, selectedTrackId } = req.body;
-
-    if (!photos || photos.length === 0) {
-      return res.status(400).json({ error: 'Fotos são obrigatórias para renderizar o vídeo.' });
-    }
-
-    const finalVideoId = videoId || `vid_${Date.now()}`;
-    console.log(`🎬 Iniciando renderização FFmpeg para vídeo ${finalVideoId}...`);
-    const localMp4Path = await renderVideoWithFFmpeg({
-      videoId: finalVideoId,
-      fatherName: fatherName || 'Pai',
-      photos,
-      aiImages,
-      useAIImages,
-      tributeText: tributeText || '',
-      narrationAudioDataUrl,
-      selectedTrackId,
+    const localMp4Path = await renderQueue.run(async () => {
+      const { renderVideoWithFFmpeg } = await import('./src/lib/ffmpeg_render.js');
+      console.log(`🎬 Iniciando renderização FFmpeg para vídeo ${finalVideoId}...`);
+      return renderVideoWithFFmpeg({
+        videoId: finalVideoId,
+        fatherName: fatherName || 'Pai',
+        photos,
+        aiImages,
+        useAIImages,
+        tributeText: tributeText || '',
+        narrationAudioDataUrl,
+        selectedTrackId,
+      });
     });
 
     // Sobe o MP4 renderizado para o Supabase Storage — em produção (Render) o disco local
@@ -780,15 +847,9 @@ app.post('/api/render-video', async (req, res) => {
 
     // Mantém o vídeo salvo no banco central atualizado com a URL definitiva do MP4 em HD
     await supabaseAdmin.from('video_jobs').update({ unlocked_video_url: durableMp4Url }).eq('id', finalVideoId);
-
-    res.json({
-      success: true,
-      mp4Url: durableMp4Url,
-      relativePath: localMp4Path,
-    });
+    console.log(`✅ Renderização concluída e publicada para ${finalVideoId}`);
   } catch (error: any) {
-    console.error('Erro na rota de renderização FFmpeg:', error);
-    res.status(500).json({ error: 'Falha ao renderizar vídeo com FFmpeg', details: error.message });
+    console.error(`❌ Erro na renderização FFmpeg de ${finalVideoId}:`, error);
   }
 });
 async function setupServer() {

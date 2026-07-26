@@ -3,6 +3,11 @@ import { Play, Pause, RotateCcw, Volume2, VolumeX, Download, CheckCircle2 } from
 import { VideoJob } from '../types';
 import { drawVideoFrame, getAllSlides } from '../lib/video';
 import { PRESET_TRACKS } from '../data/presets';
+import { fetchVideoJobRemote } from '../lib/videoApi';
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 interface VideoPlayerProps {
   video: VideoJob;
@@ -22,6 +27,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
   const [preloadedImages, setPreloadedImages] = useState<HTMLImageElement[]>([]);
   const [isReady, setIsReady] = useState<boolean>(false);
   const [isRecordingExport, setIsRecordingExport] = useState<boolean>(false);
+  const [renderStatusLabel, setRenderStatusLabel] = useState<string>('');
 
   // Load slides and images
   useEffect(() => {
@@ -201,9 +207,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
     if (narrationAudioRef.current) narrationAudioRef.current.muted = !isMuted;
   };
 
-  // Render MP4 on Server via FFmpeg and download/get link
+  // Envia o vídeo para a fila de renderização no servidor (FFmpeg) e acompanha o progresso
+  // via polling, em vez de manter a requisição HTTP aberta — em horários de pico o vídeo
+  // pode ficar alguns instantes na fila antes de começar a renderizar de fato (ver
+  // RenderQueue em server.ts), e uma conexão longa correria risco de timeout no proxy.
   const handleDownloadVideo = async () => {
     setIsRecordingExport(true);
+    setRenderStatusLabel('Enviando para a fila de renderização...');
     try {
       const response = await fetch('/api/render-video', {
         method: 'POST',
@@ -221,22 +231,47 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
       });
 
       if (!response.ok) {
-        throw new Error('Falha ao renderizar vídeo no servidor.');
+        throw new Error('Falha ao enviar o vídeo para renderização no servidor.');
       }
 
-      const data = await response.json();
-      if (data.mp4Url) {
-        const a = document.createElement('a');
-        a.href = data.mp4Url;
-        a.download = `Memoria_${video.fatherName.replace(/\s+/g, '_')}.mp4`;
-        a.target = '_blank';
-        a.click();
+      const { position } = await response.json();
+      setRenderStatusLabel(
+        position > 0
+          ? `Na fila (${position} vídeo${position > 1 ? 's' : ''} na sua frente)...`
+          : 'Renderizando vídeo em HD...'
+      );
+
+      const MAX_ATTEMPTS = 80; // até ~4min no total, cobre fila + renderização em picos
+      const POLL_INTERVAL_MS = 3000;
+      let mp4Url: string | null = null;
+
+      for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        await wait(POLL_INTERVAL_MS);
+        const updated = await fetchVideoJobRemote(video.id);
+        if (updated?.unlockedVideoUrl) {
+          mp4Url = updated.unlockedVideoUrl;
+          break;
+        }
+        if (attempt === 4) {
+          setRenderStatusLabel('Ainda finalizando — pode haver fila em horários de pico...');
+        }
       }
+
+      if (!mp4Url) {
+        throw new Error('A renderização está demorando mais do que o esperado. Tente novamente em instantes.');
+      }
+
+      const a = document.createElement('a');
+      a.href = mp4Url;
+      a.download = `Memoria_${video.fatherName.replace(/\s+/g, '_')}.mp4`;
+      a.target = '_blank';
+      a.click();
     } catch (e: any) {
       console.error(e);
-      alert('Erro ao gerar link de download do vídeo em MP4: ' + e.message);
+      alert('Erro ao gerar o vídeo em MP4: ' + e.message);
     } finally {
       setIsRecordingExport(false);
+      setRenderStatusLabel('');
     }
   };
 
@@ -330,7 +365,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
           className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-semibold text-sm rounded-xl border border-slate-700 flex items-center justify-center gap-2 transition-all active:scale-98 shadow-md"
         >
           <Download className="w-4 h-4 text-amber-400" />
-          {isRecordingExport ? 'Renderizando vídeo em HD...' : 'Baixar Vídeo em HD (.MP4)'}
+          {isRecordingExport ? renderStatusLabel || 'Renderizando vídeo em HD...' : 'Baixar Vídeo em HD (.MP4)'}
         </button>
       </div>
     </div>
