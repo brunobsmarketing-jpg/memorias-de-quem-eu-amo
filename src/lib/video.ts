@@ -1,5 +1,6 @@
 import { VideoJob, CaptionStyle } from '../types';
-import { PRESET_TRACKS, CAPTION_FONTS, CAPTION_COLORS } from '../data/presets';
+import { CAPTION_FONTS, CAPTION_COLORS } from '../data/presets';
+import { wrapCanvasText } from './imageUtils';
 
 export interface VideoRenderFrame {
   currentPhotoUrl: string;
@@ -127,24 +128,11 @@ export function drawVideoFrame(
     ctx.textBaseline = 'middle';
 
     // Wrap subtitle text if long
-    const words = subtitleText.split(' ');
-    let line = '';
-    const lines: string[] = [];
-    for (let n = 0; n < words.length; n++) {
-      const testLine = line + words[n] + ' ';
-      const metrics = ctx.measureText(testLine);
-      if (metrics.width > cardWidth - 60 && n > 0) {
-        lines.push(line);
-        line = words[n] + ' ';
-      } else {
-        line = testLine;
-      }
-    }
-    lines.push(line);
+    const lines = wrapCanvasText(ctx, subtitleText, cardWidth - 60);
 
     const startY = cardY + cardHeight / 2 - (lines.length - 1) * 20;
     lines.forEach((l, i) => {
-      ctx.fillText(l.trim(), width / 2, startY + i * 40);
+      ctx.fillText(l, width / 2, startY + i * 40);
     });
 
     ctx.restore();

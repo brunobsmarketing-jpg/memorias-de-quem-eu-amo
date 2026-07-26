@@ -2,9 +2,16 @@ import ffmpeg from 'fluent-ffmpeg';
 import ffmpegStaticPath from 'ffmpeg-static';
 import fs from 'fs';
 import path from 'path';
-import { spawn } from 'child_process';
 import { PRESET_TRACKS, CAPTION_FONTS, CAPTION_COLORS } from '../data/presets';
 import { CaptionStyle } from '../types';
+import {
+  saveBase64ToTempFile,
+  downloadUrlToTempFile,
+  writeTempTextFile,
+  getMediaDurationSeconds as getMediaDurationSecondsShared,
+  quoteFilterPath,
+  buildAudioMixFilters,
+} from './ffmpeg_shared';
 
 // O binário do pacote ffmpeg-static no Linux (usado em produção) não inclui o filtro
 // drawtext. O build de produção baixa um binário completo (com drawtext) para
@@ -64,68 +71,8 @@ function resolveCaptionStyle(captionStyle?: CaptionStyle) {
   };
 }
 
-function saveBase64ToTempFile(dataUrl: string, prefix: string, ext: string): string {
-  const tempDir = path.join(process.cwd(), 'public', 'renders', 'temp');
-  if (!fs.existsSync(tempDir)) {
-    fs.mkdirSync(tempDir, { recursive: true });
-  }
-
-  const base64Data = dataUrl.includes('base64,') ? dataUrl.split('base64,')[1] : dataUrl;
-  const filePath = path.join(tempDir, `${prefix}_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`);
-  fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
-  return filePath;
-}
-
-async function downloadUrlToTempFile(url: string, prefix: string, ext: string): Promise<string> {
-  const tempDir = path.join(process.cwd(), 'public', 'renders', 'temp');
-  if (!fs.existsSync(tempDir)) {
-    fs.mkdirSync(tempDir, { recursive: true });
-  }
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Falha ao baixar recurso remoto (${response.status}): ${url}`);
-  }
-  const buf = Buffer.from(await response.arrayBuffer());
-  const filePath = path.join(tempDir, `${prefix}_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`);
-  fs.writeFileSync(filePath, buf);
-  return filePath;
-}
-
-function writeTempTextFile(content: string, prefix: string): string {
-  const tempDir = path.join(process.cwd(), 'public', 'renders', 'temp');
-  if (!fs.existsSync(tempDir)) {
-    fs.mkdirSync(tempDir, { recursive: true });
-  }
-  const filePath = path.join(tempDir, `${prefix}_${Date.now()}_${Math.random().toString(36).substring(7)}.txt`);
-  fs.writeFileSync(filePath, content, 'utf8');
-  return filePath;
-}
-
-/**
- * Usa o próprio binário do FFmpeg (sem depender de ffprobe) para ler a duração
- * de um arquivo de áudio a partir do cabeçalho impresso no stderr.
- */
 function getMediaDurationSeconds(filePath: string): Promise<number> {
-  return new Promise((resolve) => {
-    if (!ffmpegPath) return resolve(0);
-    const proc = spawn(ffmpegPath as string, ['-i', filePath]);
-    let stderrOutput = '';
-    proc.stderr.on('data', (chunk) => {
-      stderrOutput += chunk.toString();
-    });
-    proc.on('close', () => {
-      const match = stderrOutput.match(/Duration:\s*(\d{2}):(\d{2}):(\d{2}(?:\.\d+)?)/);
-      if (match) {
-        const hours = parseInt(match[1], 10);
-        const minutes = parseInt(match[2], 10);
-        const seconds = parseFloat(match[3]);
-        resolve(hours * 3600 + minutes * 60 + seconds);
-      } else {
-        resolve(0);
-      }
-    });
-    proc.on('error', () => resolve(0));
-  });
+  return getMediaDurationSecondsShared(ffmpegPath as string | null, filePath);
 }
 
 function splitIntoSentences(text: string): string[] {
@@ -160,17 +107,6 @@ function wrapTextForSubtitle(text: string, maxCharsPerLine = 28, maxLines = 3): 
     return [...head, tail].join('\n');
   }
   return lines.join('\n');
-}
-
-/**
- * Caminho normalizado e entre aspas simples, pronto para uso como valor de opção no filtergraph do FFmpeg.
- * O ':' do drive letter do Windows (ex: C:/...) precisa ser escapado mesmo dentro de aspas simples,
- * senão o parser de filtros do FFmpeg o interpreta como separador de opção.
- */
-function quoteFilterPath(p: string): string {
-  const forwardSlashes = p.replace(/\\/g, '/');
-  const escapedColon = forwardSlashes.replace(/:/g, '\\:');
-  return `'${escapedColon}'`;
 }
 
 /**
@@ -338,27 +274,11 @@ export async function renderVideoWithFFmpeg(params: RenderVideoParams): Promise<
       }
 
       // --- Áudio: narração + trilha sonora mixadas ---
-      let audioLabel = '';
-      if (narrationInputIndex >= 0 && musicInputIndex >= 0) {
-        // apad+atrim garante que a narração preencha toda a duração do vídeo com silêncio,
-        // senão o amix (duration=first) e o -shortest cortariam o vídeo no tamanho da narração.
-        filters.push(`[${narrationInputIndex}:a]volume=1.0,apad,atrim=0:${totalDuration.toFixed(2)}[an]`);
-        filters.push(
-          `[${musicInputIndex}:a]aloop=loop=-1:size=2000000000,atrim=0:${totalDuration.toFixed(2)},` +
-          `volume=0.18,afade=t=out:st=${(totalDuration - 1.5).toFixed(2)}:d=1.5[am]`
-        );
-        filters.push(`[an][am]amix=inputs=2:duration=first:dropout_transition=2[aout]`);
-        audioLabel = 'aout';
-      } else if (narrationInputIndex >= 0) {
-        filters.push(`[${narrationInputIndex}:a]volume=1.0,apad,atrim=0:${totalDuration.toFixed(2)}[aout]`);
-        audioLabel = 'aout';
-      } else if (musicInputIndex >= 0) {
-        filters.push(
-          `[${musicInputIndex}:a]aloop=loop=-1:size=2000000000,atrim=0:${totalDuration.toFixed(2)},` +
-          `volume=0.35,afade=t=out:st=${(totalDuration - 1.5).toFixed(2)}:d=1.5[aout]`
-        );
-        audioLabel = 'aout';
-      }
+      // apad+atrim garante que a narração preencha toda a duração do vídeo com silêncio,
+      // senão o amix (duration=first) e o -shortest cortariam o vídeo no tamanho da narração.
+      const audioMix = buildAudioMixFilters({ narrationInputIndex, musicInputIndex, totalDuration });
+      filters.push(...audioMix.filters);
+      const audioLabel = audioMix.audioLabel;
 
       const outputLabels = audioLabel ? [videoLabel, audioLabel] : [videoLabel];
       command.complexFilter(filters, outputLabels);

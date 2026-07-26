@@ -1,7 +1,8 @@
-import { User, VideoJob, MediaAsset } from '../types';
+import { User, VideoJob, MemoryBookJob, MediaAsset } from '../types';
 
 const USER_STORAGE_KEY = 'memorias_user_data';
 const VIDEOS_STORAGE_KEY = 'memorias_videos_data';
+const BOOKS_STORAGE_KEY = 'memorias_books_data';
 const MEDIA_STORAGE_KEY = 'memorias_media_assets';
 
 export function getStoredUser(): User | null {
@@ -74,6 +75,43 @@ export function saveVideoJob(video: VideoJob): VideoJob[] {
 export function getVideoJobById(id: string): VideoJob | undefined {
   const videos = getStoredVideos();
   return videos.find((v) => v.id === id);
+}
+
+export function getStoredBooks(): MemoryBookJob[] {
+  try {
+    const data = localStorage.getItem(BOOKS_STORAGE_KEY);
+    if (data) {
+      return JSON.parse(data);
+    }
+  } catch (e) {
+    console.error(e);
+  }
+  return [];
+}
+
+export function saveMemoryBookJob(book: MemoryBookJob): MemoryBookJob[] {
+  const current = getStoredBooks();
+  const index = current.findIndex((b) => b.id === book.id);
+  let updated: MemoryBookJob[];
+  if (index >= 0) {
+    updated = [...current];
+    updated[index] = book;
+  } else {
+    updated = [book, ...current];
+  }
+
+  // Mesma estratégia de fallback de saveVideoJob: o Supabase é a fonte da verdade, o
+  // localStorage é só cache rápido — se a cota estourar, guarda progressivamente menos.
+  const attempts = [updated, updated.slice(0, 5), [book]];
+  for (const attempt of attempts) {
+    try {
+      localStorage.setItem(BOOKS_STORAGE_KEY, JSON.stringify(attempt));
+      return updated;
+    } catch (e) {
+      console.warn('Não foi possível salvar livros no localStorage (cota excedida?), tentando reduzir:', e);
+    }
+  }
+  return updated;
 }
 
 export function getStoredMediaAssets(): MediaAsset[] {

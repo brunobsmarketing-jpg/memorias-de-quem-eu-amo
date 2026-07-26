@@ -474,6 +474,93 @@ app.get('/api/videos/:id', async (req, res) => {
   }
 });
 
+// Salva (cria ou atualiza) um Livro de Memórias no projeto Supabase separado deste recurso.
+app.post('/api/memory-books', async (req, res) => {
+  try {
+    const book = req.body;
+    if (!book || !book.id || !book.userId) {
+      return res.status(400).json({ error: 'Livro inválido: id e userId são obrigatórios' });
+    }
+
+    // Garante que o usuário existe (FK) sem sobrescrever créditos/dados já existentes
+    const { data: existingUser } = await supabaseAdmin
+      .from('app_users')
+      .select('id')
+      .eq('id', book.userId)
+      .maybeSingle();
+    if (!existingUser) {
+      await supabaseAdmin.from('app_users').insert({ id: book.userId, name: null });
+    }
+
+    const row = {
+      id: book.id,
+      user_id: book.userId,
+      father_name: book.fatherName,
+      photos: book.photos || [],
+      pages: book.pages || [],
+      selected_track_id: book.selectedTrackId,
+      selected_voice_id: book.selectedVoiceId,
+      is_custom_voice: !!book.isCustomVoice,
+      custom_voice_audio_url: book.customVoiceAudioUrl || null,
+      narration_text: book.narrationText,
+      status: book.status,
+      progress: book.progress,
+      unlocked_video_url: book.unlockedVideoUrl || null,
+      card_url: book.cardUrl,
+      created_at: book.createdAt,
+      duration_seconds: book.durationSeconds,
+    };
+
+    const { error } = await supabaseAdmin.from('memory_book_jobs').upsert(row, { onConflict: 'id' });
+    if (error) throw error;
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Erro ao salvar livro no Supabase:', error);
+    res.status(500).json({ error: 'Falha ao salvar livro', details: error.message });
+  }
+});
+
+// Busca um Livro de Memórias pelo id — usado pela página de cartão digital público (/b/{id})
+app.get('/api/memory-books/:id', async (req, res) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('memory_book_jobs')
+      .select('*')
+      .eq('id', req.params.id)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) {
+      return res.status(404).json({ error: 'Livro não encontrado' });
+    }
+
+    res.json({
+      book: {
+        id: data.id,
+        userId: data.user_id,
+        fatherName: data.father_name,
+        photos: data.photos,
+        pages: data.pages,
+        selectedTrackId: data.selected_track_id,
+        selectedVoiceId: data.selected_voice_id,
+        isCustomVoice: data.is_custom_voice,
+        customVoiceAudioUrl: data.custom_voice_audio_url,
+        narrationText: data.narration_text,
+        status: data.status,
+        progress: data.progress,
+        unlockedVideoUrl: data.unlocked_video_url,
+        cardUrl: data.card_url,
+        createdAt: data.created_at,
+        durationSeconds: data.duration_seconds,
+      },
+    });
+  } catch (error: any) {
+    console.error('Erro ao buscar livro no Supabase:', error);
+    res.status(500).json({ error: 'Falha ao buscar livro', details: error.message });
+  }
+});
+
 // 1. Generate Emotional Tribute Text using Gemini AI
 app.post('/api/generate-text', async (req, res) => {
   try {
@@ -909,6 +996,54 @@ app.post('/api/render-video', async (req, res) => {
     console.error(`❌ Erro na renderização FFmpeg de ${finalVideoId}:`, error);
   }
 });
+
+// Mesmo padrão assíncrono de fila + polling de /api/render-video, mas para o Livro de Memórias:
+// cada página já chega pronta (PNG composto no navegador) e vira um slide com zoom/transição.
+app.post('/api/render-book-video', async (req, res) => {
+  const { bookId, pageImageUrls, narrationAudioDataUrl, selectedTrackId } = req.body;
+
+  if (!pageImageUrls || pageImageUrls.length === 0) {
+    return res.status(400).json({ error: 'É necessário ao menos uma página para renderizar o vídeo do livro.' });
+  }
+
+  const finalBookId = bookId || `book_${Date.now()}`;
+  const queuePosition = renderQueue.position;
+  res.status(202).json({ queued: true, bookId: finalBookId, position: queuePosition });
+
+  if (queuePosition > 0) {
+    console.log(`⏳ Livro ${finalBookId} entrou na fila de renderização (${queuePosition} na frente).`);
+  }
+
+  try {
+    const localMp4Path = await renderQueue.run(async () => {
+      const { renderMemoryBookWithFFmpeg } = await import('./src/lib/ffmpeg_book_render.js');
+      console.log(`📖 Iniciando renderização FFmpeg para o livro ${finalBookId}...`);
+      return renderMemoryBookWithFFmpeg({
+        bookId: finalBookId,
+        pageImageUrls,
+        narrationAudioDataUrl,
+        selectedTrackId,
+      });
+    });
+
+    const absoluteLocalPath = path.join(process.cwd(), 'public', localMp4Path.replace(/^\//, ''));
+    const fileBuffer = fs.readFileSync(absoluteLocalPath);
+    const storagePath = `books/${finalBookId}/render.mp4`;
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from(MEDIA_BUCKET)
+      .upload(storagePath, fileBuffer, { contentType: 'video/mp4', upsert: true });
+    if (uploadError) throw uploadError;
+
+    const { data: publicUrlData } = supabaseAdmin.storage.from(MEDIA_BUCKET).getPublicUrl(storagePath);
+    const durableMp4Url = publicUrlData.publicUrl;
+
+    await supabaseAdmin.from('memory_book_jobs').update({ unlocked_video_url: durableMp4Url }).eq('id', finalBookId);
+    console.log(`✅ Renderização do livro concluída e publicada para ${finalBookId}`);
+  } catch (error: any) {
+    console.error(`❌ Erro na renderização FFmpeg do livro ${finalBookId}:`, error);
+  }
+});
+
 async function setupServer() {
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({

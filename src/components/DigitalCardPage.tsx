@@ -3,38 +3,11 @@ import { Heart, QrCode, Download, Sparkles, ExternalLink, Share2, Check, Loader2
 import { VideoJob } from '../types';
 import { VideoPlayer } from './VideoPlayer';
 import { generateQRCodeDataUrl } from '../lib/qrcode';
+import { loadImage, drawImageCoverRect } from '../lib/imageUtils';
 
 interface DigitalCardPageProps {
   video: VideoJob;
   onGoHome: () => void;
-}
-
-function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    // Necessário pra imagens de outra origem (ex: Supabase Storage) não "sujarem" o canvas —
-    // sem isso, canvas.toDataURL()/toBlob() falha com SecurityError mais adiante.
-    img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error('Falha ao carregar imagem'));
-    img.src = src;
-  });
-}
-
-/** Desenha uma imagem cobrindo todo o retângulo (igual ao CSS background-size: cover). */
-function drawImageCover(ctx: CanvasRenderingContext2D, img: HTMLImageElement, width: number, height: number) {
-  const imgAspect = img.width / img.height;
-  const targetAspect = width / height;
-  let renderW = width;
-  let renderH = height;
-  if (imgAspect > targetAspect) {
-    renderW = height * imgAspect;
-  } else {
-    renderH = width / imgAspect;
-  }
-  const x = (width - renderW) / 2;
-  const y = (height - renderH) / 2;
-  ctx.drawImage(img, x, y, renderW, renderH);
 }
 
 export const DigitalCardPage: React.FC<DigitalCardPageProps> = ({ video, onGoHome }) => {
@@ -81,7 +54,7 @@ export const DigitalCardPage: React.FC<DigitalCardPageProps> = ({ video, onGoHom
       try {
         const bgUrl = await getOrGenerateCardBackground();
         const bgImg = await loadImage(bgUrl);
-        drawImageCover(ctx, bgImg, 1200, 1600);
+        drawImageCoverRect(ctx, bgImg, 0, 0, 1200, 1600);
       } catch (e) {
         console.warn('Não foi possível gerar a ilustração do cartão, usando fundo simples:', e);
         const grad = ctx.createLinearGradient(0, 0, 1200, 1600);

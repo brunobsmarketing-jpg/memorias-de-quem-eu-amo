@@ -1,0 +1,12 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "builder": "NIXPACKS",
+    "buildCommand": "npm install && npm run build && curl -L https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz -o /tmp/ffmpeg-full.tar.xz && mkdir -p ffmpeg-bin && tar -xJf /tmp/ffmpeg-full.tar.xz -C ffmpeg-bin --strip-components=1 && chmod +x ffmpeg-bin/bin/ffmpeg && rm /tmp/ffmpeg-full.tar.xz"
+  },
+  "deploy": {
+    "startCommand": "npm start",
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 3
+  }
+}

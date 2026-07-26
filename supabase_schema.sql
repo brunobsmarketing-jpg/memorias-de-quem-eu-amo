@@ -54,8 +54,30 @@ create table if not exists media_assets (
   duration_seconds integer
 );
 
+-- Livro de Memórias — mesma conta/créditos do produto de vídeo (app_users), é só outro tipo
+-- de homenagem que a pessoa pode escolher criar na mesma tela.
+create table if not exists memory_book_jobs (
+  id text primary key,
+  user_id text not null references app_users(id) on delete cascade,
+  father_name text,
+  photos jsonb not null default '[]',
+  pages jsonb not null default '[]',
+  selected_track_id text,
+  selected_voice_id text,
+  is_custom_voice boolean not null default false,
+  custom_voice_audio_url text,
+  narration_text text,
+  status text not null default 'draft',
+  progress integer not null default 0,
+  unlocked_video_url text,
+  card_url text,
+  created_at timestamptz not null default now(),
+  duration_seconds integer not null default 30
+);
+
 create index if not exists idx_video_jobs_user_id on video_jobs(user_id);
 create index if not exists idx_media_assets_user_id on media_assets(user_id);
+create index if not exists idx_memory_book_jobs_user_id on memory_book_jobs(user_id);
 
 -- RLS habilitado, sem policies para anon/authenticated: o navegador nunca fala direto com o Supabase,
 -- só o nosso servidor Express acessa essas tabelas usando a service_role key (que ignora RLS).
@@ -63,3 +85,4 @@ alter table app_users enable row level security;
 alter table video_jobs enable row level security;
 alter table payments enable row level security;
 alter table media_assets enable row level security;
+alter table memory_book_jobs enable row level security;

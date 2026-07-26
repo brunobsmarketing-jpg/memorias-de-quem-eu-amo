@@ -104,6 +104,83 @@ export interface VideoJob {
   durationSeconds: number;
 }
 
+export type BookSlotShape = 'rect' | 'polaroid' | 'circle' | 'filmstrip';
+
+export interface PageTemplateSlot {
+  id: string;
+  x: number; // fração 0-1 da largura do canvas
+  y: number; // fração 0-1 da altura do canvas
+  width: number; // fração 0-1
+  height: number; // fração 0-1
+  rotationDeg?: number;
+  shape?: BookSlotShape;
+}
+
+export interface PageTemplateTextBlock {
+  id: string;
+  x: number; // fração 0-1
+  y: number; // fração 0-1
+  width: number; // fração 0-1
+  label: string; // rótulo mostrado ao usuário no editor (ex: "Título")
+  defaultText: string;
+  maxChars: number;
+  fontSizePx: number;
+  fontWeight?: string;
+  fontFamily?: string;
+  align?: 'left' | 'center' | 'right';
+  colorHex?: string;
+}
+
+export interface PageTemplateDef {
+  id: string;
+  name: string;
+  description: string;
+  canvasWidth: number;
+  canvasHeight: number;
+  backgroundColor: string;
+  decoration?: 'filmstrip';
+  slots: PageTemplateSlot[];
+  textBlocks: PageTemplateTextBlock[];
+}
+
+export interface MemoryBookPageSlotValue {
+  slotId: string;
+  photoUrl: string;
+}
+
+export interface MemoryBookPageTextValue {
+  blockId: string;
+  text: string;
+}
+
+export interface MemoryBookPage {
+  id: string;
+  templateId: string;
+  order: number;
+  slotValues: MemoryBookPageSlotValue[];
+  textValues: MemoryBookPageTextValue[];
+  renderedImageUrl?: string; // PNG exportado da página, gerado no navegador antes do envio ao servidor
+}
+
+export interface MemoryBookJob {
+  id: string;
+  userId: string;
+  fatherName: string;
+  photos: PhotoItem[];
+  pages: MemoryBookPage[];
+  selectedTrackId: string;
+  selectedVoiceId: string;
+  isCustomVoice: boolean;
+  customVoiceAudioUrl?: string;
+  narrationText: string;
+  status: 'draft' | 'processing' | 'unlocked';
+  progress: number;
+  unlockedVideoUrl?: string;
+  cardUrl: string;
+  createdAt: string;
+  durationSeconds: number;
+}
+
 export interface CreditPackage {
   id: string;
   credits: number;

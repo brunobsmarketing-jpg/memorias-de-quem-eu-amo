@@ -10,26 +10,36 @@ import {
   Sun,
   Moon,
 } from 'lucide-react';
-import { User, VideoJob } from './types';
+import { User, VideoJob, MemoryBookJob } from './types';
 import {
   getStoredUser,
   getStoredVideos,
   saveVideoJob,
+  getStoredBooks,
+  saveMemoryBookJob,
   clearStoredUser,
 } from './lib/credits';
 import { Dashboard } from './components/Dashboard';
+import { ChooseCreationType } from './components/ChooseCreationType';
 import { CreateVideoWizard } from './components/CreateVideoWizard';
+import { CreateMemoryBookWizard } from './components/CreateMemoryBookWizard';
 import { DigitalCardPage } from './components/DigitalCardPage';
+import { DigitalBookPage } from './components/DigitalBookPage';
 import { AuthModal } from './components/AuthModal';
 import { VideoPlayer } from './components/VideoPlayer';
 import { PaywallCheckoutPage } from './components/PaywallCheckoutPage';
 import { fetchVideoJobRemote } from './lib/videoApi';
+import { fetchMemoryBookRemote } from './lib/bookApi';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(() => getStoredUser());
   const [videos, setVideos] = useState<VideoJob[]>(() => getStoredVideos());
-  const [currentView, setCurrentView] = useState<'home' | 'create' | 'card' | 'detail'>('home');
+  const [books, setBooks] = useState<MemoryBookJob[]>(() => getStoredBooks());
+  const [currentView, setCurrentView] = useState<
+    'home' | 'choose-type' | 'create' | 'create-book' | 'card' | 'book-card' | 'detail'
+  >('home');
   const [activeVideo, setActiveVideo] = useState<VideoJob | null>(null);
+  const [activeBook, setActiveBook] = useState<MemoryBookJob | null>(null);
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
   const [cardNotFound, setCardNotFound] = useState<boolean>(false);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
@@ -86,12 +96,62 @@ export default function App() {
       });
   }, []);
 
+  // Mesma lógica acima, mas para o link público do Livro de Memórias: /b/{id}
+  useEffect(() => {
+    const path = window.location.pathname;
+    const searchParams = new URLSearchParams(window.location.search);
+    const bookIdParam = searchParams.get('book') || (path.startsWith('/b/') ? path.replace('/b/', '') : '');
+
+    if (!bookIdParam) return;
+
+    setCurrentView('book-card');
+
+    const found = books.find((b) => b.id === bookIdParam);
+    if (found) {
+      setActiveBook(found);
+      return;
+    }
+
+    fetchMemoryBookRemote(bookIdParam)
+      .then((remoteBook) => {
+        if (remoteBook) {
+          saveMemoryBookJob(remoteBook);
+          setActiveBook(remoteBook);
+          setCurrentView('book-card');
+        } else {
+          setCardNotFound(true);
+          setCurrentView('book-card');
+        }
+      })
+      .catch((e) => {
+        console.error('Erro ao buscar livro de memórias:', e);
+        setCardNotFound(true);
+        setCurrentView('book-card');
+      });
+  }, []);
+
   const handleStartCreation = () => {
     if (!user || !user.isPaidMember) {
       alert('É necessário ser um membro pagante para criar homenagens. Escolha seu plano.');
       return;
     }
-    setCurrentView('create');
+    setCurrentView('choose-type');
+  };
+
+  const handleChooseCreationType = (type: 'video' | 'book') => {
+    setCurrentView(type === 'video' ? 'create' : 'create-book');
+  };
+
+  const handleFinishBookCreation = (newBook: MemoryBookJob) => {
+    const updatedList = getStoredBooks();
+    setBooks(updatedList);
+    setActiveBook(newBook);
+    setCurrentView('book-card');
+  };
+
+  const handleSelectBook = (book: MemoryBookJob) => {
+    setActiveBook(book);
+    setCurrentView('book-card');
   };
 
   const handleFinishCreation = (newVideo: VideoJob) => {
@@ -149,6 +209,44 @@ export default function App() {
     );
   }
 
+  // Mesmo padrão acima, para o link público do Livro de Memórias
+  if (currentView === 'book-card' && activeBook) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+        <DigitalBookPage book={activeBook} onGoHome={() => setCurrentView('home')} />
+      </div>
+    );
+  }
+
+  if (currentView === 'book-card' && cardNotFound) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center text-center px-4 space-y-4 font-sans">
+        <Heart className="w-10 h-10 text-amber-400" />
+        <h1 className="text-xl font-bold">Livro não encontrado</h1>
+        <p className="text-slate-400 text-sm max-w-sm">
+          Este link de livro não existe ou ainda está sendo processado. Verifique se o link foi copiado corretamente.
+        </p>
+        <button
+          onClick={() => {
+            setCardNotFound(false);
+            setCurrentView('home');
+          }}
+          className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm rounded-xl"
+        >
+          Ir para a página inicial
+        </button>
+      </div>
+    );
+  }
+
+  if (currentView === 'book-card') {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <span className="text-slate-400 text-sm">Carregando livro de memórias...</span>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-amber-500 selection:text-black">
       {/* Global Navbar */}
@@ -192,7 +290,7 @@ export default function App() {
                   onClick={handleStartCreation}
                   className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-extrabold text-xs rounded-xl shadow-md transition-transform active:scale-95 flex items-center gap-1.5"
                 >
-                  <PlusCircle className="w-4 h-4" /> Criar Vídeo
+                  <PlusCircle className="w-4 h-4" /> Criar Homenagem
                 </button>
 
                 <button
@@ -231,12 +329,29 @@ export default function App() {
         {/* VIEW 2: PAID MEMBERS AREA (when user is paid) */}
         {user && user.isPaidMember && (
           <>
+            {/* ESCOLHA DO TIPO DE HOMENAGEM (vídeo vs livro) */}
+            {currentView === 'choose-type' && (
+              <ChooseCreationType
+                onChoose={handleChooseCreationType}
+                onCancel={() => setCurrentView('home')}
+              />
+            )}
+
             {/* WIZARD CREATION FLOW */}
             {currentView === 'create' && (
               <CreateVideoWizard
                 user={user}
                 setUser={setUser as React.Dispatch<React.SetStateAction<User>>}
                 onFinish={handleFinishCreation}
+                onCancel={() => setCurrentView('home')}
+              />
+            )}
+
+            {currentView === 'create-book' && (
+              <CreateMemoryBookWizard
+                user={user}
+                setUser={setUser as React.Dispatch<React.SetStateAction<User>>}
+                onFinish={handleFinishBookCreation}
                 onCancel={() => setCurrentView('home')}
               />
             )}
@@ -278,8 +393,10 @@ export default function App() {
                 user={user}
                 setUser={setUser as React.Dispatch<React.SetStateAction<User>>}
                 videos={videos}
-                onStartNewVideo={handleStartCreation}
+                books={books}
+                onStartCreation={handleStartCreation}
                 onSelectVideo={handleSelectVideo}
+                onSelectBook={handleSelectBook}
                 onLogout={handleLogout}
               />
             )}
