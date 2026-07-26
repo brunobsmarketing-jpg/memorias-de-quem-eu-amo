@@ -99,7 +99,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
             <button
               onClick={onStartNewVideo}
-              className="w-full sm:w-auto px-6 py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-extrabold text-sm rounded-2xl shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap"
+              className="w-full sm:w-auto px-6 py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-extrabold text-sm rounded-2xl shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap"
             >
               <PlusCircle className="w-5 h-5" /> Criar Homenagem
             </button>
@@ -162,7 +162,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           onClick={() => setActiveSection('videos')}
           className={`px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
             activeSection === 'videos'
-              ? 'bg-amber-500 text-slate-950 shadow-md'
+              ? 'bg-amber-500 text-black shadow-md'
               : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
           }`}
         >
@@ -173,7 +173,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           onClick={() => setActiveSection('media')}
           className={`px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
             activeSection === 'media'
-              ? 'bg-amber-500 text-slate-950 shadow-md'
+              ? 'bg-amber-500 text-black shadow-md'
               : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
           }`}
         >
@@ -211,7 +211,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </div>
               <button
                 onClick={onStartNewVideo}
-                className="px-6 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm rounded-xl shadow-lg transition-transform active:scale-95 inline-flex items-center gap-2"
+                className="px-6 py-3 bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm rounded-xl shadow-lg transition-transform active:scale-95 inline-flex items-center gap-2"
               >
                 <PlusCircle className="w-5 h-5" /> Iniciar Criação
               </button>
@@ -337,7 +337,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <button
                 onClick={handleSimulateAddCredits}
                 disabled={isProcessingPayment}
-                className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold text-sm rounded-xl transition-all flex items-center justify-center gap-2"
+                className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-bold text-sm rounded-xl transition-all flex items-center justify-center gap-2"
               >
                 {isProcessingPayment ? 'Adicionando...' : `Adicionar ${selectedPkg.credits} Crédito(s)`}
               </button>

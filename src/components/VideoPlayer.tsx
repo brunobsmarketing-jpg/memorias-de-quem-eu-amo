@@ -355,7 +355,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaption
               <div className="flex items-center gap-3">
                 <button
                   onClick={togglePlay}
-                  className="p-3.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-full shadow-lg transition-transform active:scale-95 flex items-center justify-center"
+                  className="p-3.5 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-full shadow-lg transition-transform active:scale-95 flex items-center justify-center"
                 >
                   {isPlaying ? <Pause className="w-6 h-6 fill-current" /> : <Play className="w-6 h-6 fill-current ml-0.5" />}
                 </button>

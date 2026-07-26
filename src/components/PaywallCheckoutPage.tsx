@@ -135,7 +135,7 @@ export const PaywallCheckoutPage: React.FC<PaywallCheckoutPageProps> = ({
           <button
             type="submit"
             disabled={isProcessing}
-            className="w-full py-4 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-extrabold text-base rounded-2xl shadow-xl transition-all active:scale-98 flex items-center justify-center gap-2 mt-4"
+            className="w-full py-4 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 hover:from-amber-400 hover:to-orange-400 text-black font-extrabold text-base rounded-2xl shadow-xl transition-all active:scale-98 flex items-center justify-center gap-2 mt-4"
           >
             {isProcessing ? (
               <span className="flex items-center gap-2">

@@ -258,7 +258,7 @@ export const DigitalCardPage: React.FC<DigitalCardPageProps> = ({ video, onGoHom
         <div className="text-center pt-6">
           <button
             onClick={onGoHome}
-            className="px-8 py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold text-sm rounded-2xl shadow-xl transition-transform active:scale-95 inline-flex items-center gap-2"
+            className="px-8 py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-bold text-sm rounded-2xl shadow-xl transition-transform active:scale-95 inline-flex items-center gap-2"
           >
             <Sparkles className="w-5 h-5" /> Crie o Seu Vídeo Homenagem Também
           </button>

@@ -16,3 +16,34 @@
 body {
   font-family: var(--font-sans);
 }
+
+/* Modo claro — preto, branco e azul DeepSkyBlue (#00BFFF), visual limpo.
+   Funciona redefinindo as MESMAS variáveis de cor do Tailwind (--color-slate-*,
+   --color-amber-*, --color-orange-*, --color-ember-*) usadas em todo o app — nenhuma
+   classNames precisou mudar, só o valor por trás de cada token quando data-theme="light"
+   está ativo no <html>. Meta padrão continua o modo escuro (dark) já existente. */
+:root[data-theme='light'] {
+  /* Neutros: fundo branco, texto preto, escala de cinza só pro meio-termo (bordas/cards) */
+  --color-slate-950: #ffffff;
+  --color-slate-900: #f7f8fa;
+  --color-slate-800: #e7e9ed;
+  --color-slate-700: #d3d7de;
+  --color-slate-600: #9ca3af;
+  --color-slate-500: #6b7280;
+  --color-slate-400: #52525b;
+  --color-slate-300: #3f3f46;
+  --color-slate-200: #27272a;
+  --color-slate-100: #0a0a0a;
+
+  /* Acento: dourado/amber e laranja viram a mesma família de azul DeepSkyBlue */
+  --color-amber-200: #b3e8ff;
+  --color-amber-300: #7dd8ff;
+  --color-amber-400: #00bfff;
+  --color-amber-500: #009fdb;
+  --color-orange-400: #00bfff;
+  --color-orange-500: #0072a8;
+
+  /* Ember (terracota) também vira azul no modo claro, mantendo só as 3 cores pedidas */
+  --color-ember-400: #00bfff;
+  --color-ember-500: #009fdb;
+}

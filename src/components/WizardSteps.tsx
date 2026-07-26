@@ -224,7 +224,7 @@ export const Step1UploadPhotos: React.FC<Step1UploadProps> = ({ photos, setPhoto
         <button
           onClick={onNext}
           disabled={!aiOnlyMode && photos.length < 3}
-          className="px-6 py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 font-bold rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-2"
+          className="px-6 py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed text-black font-bold rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-2"
         >
           {aiOnlyMode
             ? 'Próximo Passo: Texto da Homenagem'
@@ -327,7 +327,7 @@ export const Step2TextTribute: React.FC<Step2TextProps> = ({
         <button
           onClick={() => setActiveTab('ai')}
           className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-            activeTab === 'ai' ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-slate-200'
+            activeTab === 'ai' ? 'bg-amber-500 text-black shadow-md' : 'text-slate-400 hover:text-slate-200'
           }`}
         >
           <Wand2 className="w-4 h-4" /> Gerar com IA
@@ -335,7 +335,7 @@ export const Step2TextTribute: React.FC<Step2TextProps> = ({
         <button
           onClick={() => setActiveTab('free')}
           className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-            activeTab === 'free' ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-slate-200'
+            activeTab === 'free' ? 'bg-amber-500 text-black shadow-md' : 'text-slate-400 hover:text-slate-200'
           }`}
         >
           Escrever Texto Livre
@@ -399,7 +399,7 @@ export const Step2TextTribute: React.FC<Step2TextProps> = ({
           <button
             onClick={handleGenerateAI}
             disabled={isGenerating}
-            className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-50 text-slate-950 font-bold text-sm rounded-xl shadow-lg transition-transform active:scale-98 flex items-center justify-center gap-2"
+            className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-50 text-black font-bold text-sm rounded-xl shadow-lg transition-transform active:scale-98 flex items-center justify-center gap-2"
           >
             {isGenerating ? (
               <>
@@ -439,7 +439,7 @@ export const Step2TextTribute: React.FC<Step2TextProps> = ({
         <button
           onClick={onNext}
           disabled={!fatherName || !tributeText.trim()}
-          className="px-6 py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-950 font-bold rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-2"
+          className="px-6 py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-black font-bold rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-2"
         >
           Próximo Passo: Escolher Narração
         </button>
@@ -689,7 +689,7 @@ export const Step3NarrationVoice: React.FC<Step3VoiceProps> = ({
             ) : (
               <button
                 onClick={handleStopRecord}
-                className="w-20 h-20 rounded-full bg-amber-500 animate-pulse text-slate-950 flex flex-col items-center justify-center shadow-xl font-bold"
+                className="w-20 h-20 rounded-full bg-amber-500 animate-pulse text-black flex flex-col items-center justify-center shadow-xl font-bold"
               >
                 <SquareIcon className="w-7 h-7" />
               </button>
@@ -736,7 +736,7 @@ export const Step3NarrationVoice: React.FC<Step3VoiceProps> = ({
         </button>
         <button
           onClick={onNext}
-          className="px-6 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-2"
+          className="px-6 py-3 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-2"
         >
           Próximo Passo: Trilha Sonora
         </button>
@@ -811,7 +811,7 @@ export const Step4MusicTrack: React.FC<Step4MusicProps> = ({
                   e.stopPropagation();
                   toggleTrackPlay(track);
                 }}
-                className="p-3 bg-amber-500 text-slate-950 font-bold rounded-full hover:scale-105 transition-transform"
+                className="p-3 bg-amber-500 text-black font-bold rounded-full hover:scale-105 transition-transform"
               >
                 {playingTrackId === track.id ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
               </button>
@@ -835,7 +835,7 @@ export const Step4MusicTrack: React.FC<Step4MusicProps> = ({
         </button>
         <button
           onClick={onNext}
-          className="px-6 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-2"
+          className="px-6 py-3 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-2"
         >
           Próximo Passo: Imagens Ilustrativas IA
         </button>
@@ -1109,7 +1109,7 @@ export const Step5AIImagesOption: React.FC<Step5AIImagesProps> = ({
           onClick={onNext}
           disabled={isSubmitting || !canProceed}
           title={aiOnlyMode && aiImages.length < 3 ? 'Gere pelo menos 3 ilustrações para continuar' : undefined}
-          className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-50 text-slate-950 font-bold rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-2"
+          className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-50 text-black font-bold rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-2"
         >
           {isSubmitting ? (
             <>

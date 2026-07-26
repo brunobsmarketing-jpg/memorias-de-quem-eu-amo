@@ -279,7 +279,7 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
 
             <button
               onClick={() => onFinish(createdJob)}
-              className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-extrabold text-sm rounded-xl shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2 mx-auto"
+              className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-extrabold text-sm rounded-xl shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2 mx-auto"
             >
               <Sparkles className="w-4 h-4" /> Ver Cartão Digital e Compartilhar
             </button>

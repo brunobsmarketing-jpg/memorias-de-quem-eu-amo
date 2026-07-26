@@ -7,6 +7,8 @@ import {
   LogOut,
   Lock,
   Sparkles,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { User, VideoJob } from './types';
 import {
@@ -30,6 +32,23 @@ export default function App() {
   const [activeVideo, setActiveVideo] = useState<VideoJob | null>(null);
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
   const [cardNotFound, setCardNotFound] = useState<boolean>(false);
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    const stored = localStorage.getItem('memorias_theme');
+    return stored === 'light' ? 'light' : 'dark';
+  });
+
+  // Modo escuro continua o padrão — só aplica o atributo quando "light" está ativo, já que o
+  // CSS (index.css) só define overrides de cor para :root[data-theme='light'].
+  useEffect(() => {
+    if (theme === 'light') {
+      document.documentElement.setAttribute('data-theme', 'light');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+    }
+    localStorage.setItem('memorias_theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
 
   // Check URL pathname or search params for public card link /c/{id}
   useEffect(() => {
@@ -114,7 +133,7 @@ export default function App() {
             setCardNotFound(false);
             setCurrentView('home');
           }}
-          className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm rounded-xl"
+          className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm rounded-xl"
         >
           Ir para a página inicial
         </button>
@@ -131,7 +150,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-amber-500 selection:text-slate-950">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-amber-500 selection:text-black">
       {/* Global Navbar */}
       <header className="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-md border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
@@ -140,7 +159,7 @@ export default function App() {
             onClick={() => setCurrentView('home')}
             className="flex items-center gap-2.5 cursor-pointer group"
           >
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-slate-950 shadow-md group-hover:scale-105 transition-transform">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-black shadow-md group-hover:scale-105 transition-transform">
               <Heart className="w-5 h-5 fill-slate-950" />
             </div>
             <div>
@@ -155,6 +174,13 @@ export default function App() {
 
           {/* User Status / Actions */}
           <div className="flex items-center gap-3">
+            <button
+              onClick={toggleTheme}
+              className="p-2 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-xl border border-slate-800 transition-colors"
+              title={theme === 'dark' ? 'Mudar para modo claro' : 'Mudar para modo escuro'}
+            >
+              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
             {user && user.isPaidMember ? (
               <>
                 <div className="hidden sm:flex items-center gap-2 bg-slate-900 border border-slate-800 px-3.5 py-1.5 rounded-full text-xs font-bold">
@@ -164,7 +190,7 @@ export default function App() {
 
                 <button
                   onClick={handleStartCreation}
-                  className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-extrabold text-xs rounded-xl shadow-md transition-transform active:scale-95 flex items-center gap-1.5"
+                  className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-extrabold text-xs rounded-xl shadow-md transition-transform active:scale-95 flex items-center gap-1.5"
                 >
                   <PlusCircle className="w-4 h-4" /> Criar Vídeo
                 </button>
