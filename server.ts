@@ -852,8 +852,12 @@ app.post('/api/clone-voice', async (req, res) => {
 app.post('/api/render-video', async (req, res) => {
   const { videoId, fatherName, photos, aiImages, useAIImages, tributeText, narrationAudioDataUrl, selectedTrackId, captionStyle } = req.body;
 
-  if (!photos || photos.length === 0) {
-    return res.status(400).json({ error: 'Fotos são obrigatórias para renderizar o vídeo.' });
+  // No modo "só IA" o vídeo não tem nenhuma foto real — o conteúdo visual inteiro vem de
+  // aiImages. Validar só "photos" rejeitava esses vídeos com 400 antes mesmo de chegar no
+  // FFmpeg (que já sabia combinar os dois corretamente).
+  const hasAnyImage = (photos && photos.length > 0) || (useAIImages && aiImages && aiImages.length > 0);
+  if (!hasAnyImage) {
+    return res.status(400).json({ error: 'É necessário ao menos uma foto ou imagem de IA para renderizar o vídeo.' });
   }
 
   const finalVideoId = videoId || `vid_${Date.now()}`;
