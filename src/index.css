@@ -35,15 +35,28 @@ body {
   --color-slate-200: #27272a;
   --color-slate-100: #0a0a0a;
 
-  /* Acento: dourado/amber e laranja viram a mesma família de azul DeepSkyBlue */
-  --color-amber-200: #b3e8ff;
-  --color-amber-300: #7dd8ff;
-  --color-amber-400: #00bfff;
-  --color-amber-500: #009fdb;
-  --color-orange-400: #00bfff;
-  --color-orange-500: #0072a8;
+  /* Acento: dourado/amber e laranja viram a mesma família de azul DeepSkyBlue.
+     amber-400 é usado em ~50 lugares como cor de TEXTO/ícone (não só fundo de botão) —
+     por isso não pode ser o "#00BFFF" claro pedido (contraste de ~2:1 num fundo branco,
+     ilegível). amber-500 (só usado como fundo sólido de botão, sempre com texto preto
+     em cima) pode ficar mais vívido/próximo do tom pedido, já que ali quem garante a
+     leitura é o texto preto, não a cor de fundo em si. */
+  --color-amber-200: #0077b6;
+  --color-amber-300: #0077b6;
+  --color-amber-400: #0077b6;
+  --color-amber-500: #00a8e8;
+  --color-orange-400: #0096c7;
+  --color-orange-500: #023e73;
 
-  /* Ember (terracota) também vira azul no modo claro, mantendo só as 3 cores pedidas */
-  --color-ember-400: #00bfff;
-  --color-ember-500: #009fdb;
+  /* Ember (terracota) também vira azul no modo claro, mantendo só as 3 cores pedidas —
+     mesma lógica de contraste do amber (ember-400 é usado como cor de ícone/texto). */
+  --color-ember-400: #0077b6;
+  --color-ember-500: #00a8e8;
+
+  /* Verde de sucesso e vermelho de erro/aviso também são usados como cor de texto — os
+     tons padrão (pensados pra fundo escuro) ficam quase ilegíveis em fundo branco. */
+  --color-emerald-300: #15803d;
+  --color-emerald-400: #15803d;
+  --color-rose-300: #b91c1c;
+  --color-rose-400: #b91c1c;
 }

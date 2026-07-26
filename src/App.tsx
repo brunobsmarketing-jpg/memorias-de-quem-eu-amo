@@ -34,11 +34,11 @@ export default function App() {
   const [cardNotFound, setCardNotFound] = useState<boolean>(false);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const stored = localStorage.getItem('memorias_theme');
-    return stored === 'light' ? 'light' : 'dark';
+    return stored === 'dark' ? 'dark' : 'light';
   });
 
-  // Modo escuro continua o padrão — só aplica o atributo quando "light" está ativo, já que o
-  // CSS (index.css) só define overrides de cor para :root[data-theme='light'].
+  // Modo claro agora é o padrão — só remove o atributo quando "dark" está ativo, já que o
+  // CSS (index.css) define overrides de cor para :root[data-theme='light'].
   useEffect(() => {
     if (theme === 'light') {
       document.documentElement.setAttribute('data-theme', 'light');

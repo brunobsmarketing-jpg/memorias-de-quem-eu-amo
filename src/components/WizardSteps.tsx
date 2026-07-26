@@ -15,6 +15,7 @@ import {
   Sparkles,
   Heart,
   Volume2,
+  MousePointerClick,
 } from 'lucide-react';
 import { PhotoItem, AITextPromptData, PresetVoice, PresetTrack } from '../types';
 import { PRESET_VOICES, PRESET_TRACKS, AI_IMAGE_STYLES } from '../data/presets';
@@ -22,6 +23,16 @@ import { generateAITributeText } from '../lib/textgen';
 import { extractVisualThemesFromText, generateAIIllustrationImage, VisualTheme } from '../lib/imagegen';
 import { VoiceRecorder, synthesizeTTSNarration, cloneVoiceAndSynthesize } from '../lib/voice';
 import { resizeImageToDataUrl, MAX_UPLOAD_FILE_SIZE_BYTES, formatFileSizeMB } from '../lib/imageUtils';
+
+/** Aviso fixo no topo de cada etapa explicando exatamente o que a pessoa precisa fazer
+    para poder avançar — complementa as mensagens de validação que só aparecem quando
+    falta algo, dando a instrução ANTES dela tentar avançar. */
+const StepInstruction: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className="max-w-xl mx-auto flex items-start gap-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3">
+    <MousePointerClick className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
+    <p className="text-xs text-slate-300 leading-relaxed">{children}</p>
+  </div>
+);
 
 // --- STEP 1: Upload de Fotos ---
 interface Step1UploadProps {
@@ -103,6 +114,11 @@ export const Step1UploadPhotos: React.FC<Step1UploadProps> = ({ photos, setPhoto
           Envie de 3 a 8 fotos com seu pai. O slideshow vai exibir cada momento em alta definição com transições suaves.
         </p>
       </div>
+
+      <StepInstruction>
+        <strong>O que fazer agora:</strong> clique em "Clique ou arraste suas fotos aqui" abaixo e envie pelo menos 3
+        fotos. Se não tiver fotos boas, clique em "Não tenho fotos boas" para criar o vídeo só com ilustrações de IA.
+      </StepInstruction>
 
       {/* Escolha: tenho fotos vs. quero criar só com ilustrações de IA */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl mx-auto">
@@ -303,6 +319,11 @@ export const Step2TextTribute: React.FC<Step2TextProps> = ({
           Escreva seu próprio texto de carinho ou use nosso assistente de IA para criar uma homenagem poética inesquecível.
         </p>
       </div>
+
+      <StepInstruction>
+        <strong>O que fazer agora:</strong> preencha o nome do pai abaixo e depois clique em "Criar Homenagem
+        Emocionante com IA" (ou escreva o texto você mesmo na caixa de texto) para continuar.
+      </StepInstruction>
 
       {/* Basic Info Fields */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-900/60 p-5 rounded-2xl border border-slate-800">
@@ -562,6 +583,12 @@ export const Step3NarrationVoice: React.FC<Step3VoiceProps> = ({
           Escolha uma voz profissional de nosso estúdio ou grave a sua própria voz para emocionar seu pai com suas palavras.
         </p>
       </div>
+
+      <StepInstruction>
+        <strong>O que fazer agora:</strong> clique em uma das vozes abaixo e aguarde a narração terminar de gerar
+        (leva alguns segundos), ou grave sua própria voz e clone-a com IA, ou escolha "Sem Narração Falada" — uma
+        dessas três opções precisa terminar antes de continuar.
+      </StepInstruction>
 
       {/* Voice Mode Choice */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -833,6 +860,11 @@ export const Step4MusicTrack: React.FC<Step4MusicProps> = ({
         </p>
       </div>
 
+      <StepInstruction>
+        <strong>O que fazer agora:</strong> já vem uma faixa selecionada (marcada com um círculo dourado), mas você
+        pode clicar no ícone de play para ouvir cada opção e escolher outra clicando nela. Depois é só continuar.
+      </StepInstruction>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {PRESET_TRACKS.map((track) => (
           <div
@@ -977,6 +1009,20 @@ export const Step5AIImagesOption: React.FC<Step5AIImagesProps> = ({
             : 'Deseja complementar o vídeo intercalando fotos reais com ilustrações conceituais geradas por IA?'}
         </p>
       </div>
+
+      <StepInstruction>
+        {aiOnlyMode ? (
+          <>
+            <strong>O que fazer agora:</strong> escolha um estilo de ilustração abaixo e clique em "Gerar
+            Ilustrações" — é preciso gerar pelo menos 3 imagens para continuar.
+          </>
+        ) : (
+          <>
+            <strong>O que fazer agora:</strong> esse passo é opcional. Se quiser adicionar ilustrações de IA, escolha
+            um estilo e clique em "Gerar Ilustrações"; se não quiser, pode clicar direto em "Gerar Vídeo e Prévia".
+          </>
+        )}
+      </StepInstruction>
 
       {/* Style Picker */}
       <div className="space-y-2">
