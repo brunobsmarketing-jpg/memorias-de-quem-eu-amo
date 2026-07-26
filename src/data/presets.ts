@@ -209,6 +209,20 @@ export const PRESET_TRACKS: PresetTrack[] = [
     audioUrl: 'https://jshdugdrqneuikrlwrum.supabase.co/storage/v1/object/public/media/tracks/track-sonhadora.mp3',
     durationSeconds: 65,
   },
+  {
+    id: 'track-alegre2',
+    title: 'Margarida Alegre',
+    category: 'Alegre',
+    audioUrl: 'https://jshdugdrqneuikrlwrum.supabase.co/storage/v1/object/public/media/tracks/track-alegre2.mp3',
+    durationSeconds: 65,
+  },
+  {
+    id: 'track-alegre3',
+    title: 'Juntos e Felizes',
+    category: 'Alegre',
+    audioUrl: 'https://jshdugdrqneuikrlwrum.supabase.co/storage/v1/object/public/media/tracks/track-alegre3.mp3',
+    durationSeconds: 65,
+  },
 ];
 
 export const CREDIT_PACKAGES: CreditPackage[] = [
