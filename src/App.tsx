@@ -228,7 +228,7 @@ export default function App() {
                 <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h2 className="text-2xl font-bold text-slate-100">Homenagem para {activeVideo.fatherName}</h2>
+                      <h2 className="font-serif text-2xl font-semibold text-slate-100">Homenagem para {activeVideo.fatherName}</h2>
                       <p className="text-xs text-slate-400">Criado em {new Date(activeVideo.createdAt).toLocaleDateString('pt-BR')}</p>
                     </div>
                     <a

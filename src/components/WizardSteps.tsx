@@ -96,7 +96,7 @@ export const Step1UploadPhotos: React.FC<Step1UploadProps> = ({ photos, setPhoto
   return (
     <div className="space-y-6">
       <div className="text-center max-w-xl mx-auto space-y-2">
-        <h3 className="text-2xl font-bold text-slate-100 flex items-center justify-center gap-2">
+        <h3 className="font-serif text-2xl font-semibold text-slate-100 flex items-center justify-center gap-2">
           <Upload className="w-6 h-6 text-amber-400" /> Passo 1: Fotos Marcantes
         </h3>
         <p className="text-slate-400 text-sm">
@@ -290,8 +290,8 @@ export const Step2TextTribute: React.FC<Step2TextProps> = ({
   return (
     <div className="space-y-6">
       <div className="text-center max-w-xl mx-auto space-y-2">
-        <h3 className="text-2xl font-bold text-slate-100 flex items-center justify-center gap-2">
-          <Heart className="w-6 h-6 text-rose-400 fill-rose-500/20" /> Passo 2: Mensagem do Coração
+        <h3 className="font-serif text-2xl font-semibold text-slate-100 flex items-center justify-center gap-2">
+          <Heart className="w-6 h-6 text-ember-400 fill-ember-500/20" /> Passo 2: Mensagem do Coração
         </h3>
         <p className="text-slate-400 text-sm">
           Escreva seu próprio texto de carinho ou use nosso assistente de IA para criar uma homenagem poética inesquecível.
@@ -539,7 +539,7 @@ export const Step3NarrationVoice: React.FC<Step3VoiceProps> = ({
   return (
     <div className="space-y-6">
       <div className="text-center max-w-xl mx-auto space-y-2">
-        <h3 className="text-2xl font-bold text-slate-100 flex items-center justify-center gap-2">
+        <h3 className="font-serif text-2xl font-semibold text-slate-100 flex items-center justify-center gap-2">
           <Mic className="w-6 h-6 text-amber-400" /> Passo 3: Voz e Narração
         </h3>
         <p className="text-slate-400 text-sm">
@@ -785,7 +785,7 @@ export const Step4MusicTrack: React.FC<Step4MusicProps> = ({
   return (
     <div className="space-y-6">
       <div className="text-center max-w-xl mx-auto space-y-2">
-        <h3 className="text-2xl font-bold text-slate-100 flex items-center justify-center gap-2">
+        <h3 className="font-serif text-2xl font-semibold text-slate-100 flex items-center justify-center gap-2">
           <Music className="w-6 h-6 text-amber-400" /> Passo 4: Melodia Instrumental
         </h3>
         <p className="text-slate-400 text-sm">
@@ -907,7 +907,7 @@ export const Step5AIImagesOption: React.FC<Step5AIImagesProps> = ({
   return (
     <div className="space-y-6">
       <div className="text-center max-w-xl mx-auto space-y-2">
-        <h3 className="text-2xl font-bold text-slate-100 flex items-center justify-center gap-2">
+        <h3 className="font-serif text-2xl font-semibold text-slate-100 flex items-center justify-center gap-2">
           <ImageIcon className="w-6 h-6 text-amber-400" /> Passo 5: {aiOnlyMode ? 'Ilustrações com IA' : 'Complemento Artístico IA'}
         </h3>
         <p className="text-slate-400 text-sm">

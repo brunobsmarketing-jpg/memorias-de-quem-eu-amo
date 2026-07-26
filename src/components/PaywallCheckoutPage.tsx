@@ -62,7 +62,7 @@ export const PaywallCheckoutPage: React.FC<PaywallCheckoutPageProps> = ({
           <Lock className="w-3.5 h-3.5" /> Acesso à Área de Membros
         </div>
 
-        <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-100 tracking-tight">
+        <h1 className="font-serif text-3xl sm:text-4xl font-semibold text-slate-100 tracking-tight">
           Entrar na Sua Conta de Homenagens
         </h1>
 

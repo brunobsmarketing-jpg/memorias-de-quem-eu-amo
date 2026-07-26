@@ -52,7 +52,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess, onCancel, onGoT
           <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-400 flex items-center justify-center mx-auto border border-amber-500/20">
             <Heart className="w-6 h-6 fill-amber-400/20 text-amber-400" />
           </div>
-          <h3 className="text-2xl font-bold text-slate-100">
+          <h3 className="font-serif text-2xl font-semibold text-slate-100">
             Acesso à Área de Membros
           </h3>
           <p className="text-xs text-slate-400">

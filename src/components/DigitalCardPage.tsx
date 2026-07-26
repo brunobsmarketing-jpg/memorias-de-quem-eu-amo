@@ -180,9 +180,9 @@ export const DigitalCardPage: React.FC<DigitalCardPageProps> = ({ video, onGoHom
         {/* Header Branding */}
         <div className="text-center space-y-3">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-300 border border-amber-500/20">
-            <Heart className="w-3.5 h-3.5 text-rose-400 fill-rose-400" /> Cartão Digital Especial
+            <Heart className="w-3.5 h-3.5 text-ember-400 fill-ember-500" /> Cartão Digital Especial
           </span>
-          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-100">
+          <h1 className="font-serif text-3xl sm:text-4xl font-semibold tracking-tight text-slate-100">
             Feliz Dia dos Pais, {video.fatherName}!
           </h1>
           <p className="text-slate-400 text-sm max-w-lg mx-auto">

@@ -1,1 +1,18 @@
 @import "tailwindcss";
+
+@theme {
+  --font-sans: 'Poppins', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Fraunces', Georgia, serif;
+
+  /* Acento emocional (terracota) — reservado para os poucos momentos de afeto explícito
+     (ícones de coração, palavra "amor"), separado do dourado/amber usado para CTAs e
+     elementos de valor/premium. */
+  --color-ember-400: #d98a8e;
+  --color-ember-500: #c1666b;
+  --color-ember-600: #a84e53;
+  --color-ember-700: #8a3d42;
+}
+
+body {
+  font-family: var(--font-sans);
+}
