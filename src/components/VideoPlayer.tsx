@@ -17,6 +17,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [duration, setDuration] = useState<number>(video.durationSeconds || 30);
+  const [narrationDuration, setNarrationDuration] = useState<number | null>(null);
   const [slides, setSlides] = useState<{ id: string; url: string }[]>([]);
   const [preloadedImages, setPreloadedImages] = useState<HTMLImageElement[]>([]);
   const [isReady, setIsReady] = useState<boolean>(false);
@@ -75,6 +76,19 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
 
   // Audio track configuration
   const selectedTrack = PRESET_TRACKS.find((t) => t.id === video.selectedTrackId) || PRESET_TRACKS[0];
+
+  // A prévia precisa durar o mesmo tempo que o vídeo final renderizado no servidor, que é
+  // calculado a partir da duração REAL da narração (ver ffmpeg_render.ts) — não da quantidade
+  // de fotos. Sem isso, a prévia corta a narração e dessincroniza a legenda quando o texto é
+  // mais longo do que "quantidade de fotos x 6s".
+  useEffect(() => {
+    if (narrationDuration && narrationDuration > 0) {
+      const MIN_DURATION = 20;
+      const MAX_DURATION = 75;
+      const NARRATION_TAIL_SECONDS = 1.5;
+      setDuration(Math.min(MAX_DURATION, Math.max(MIN_DURATION, narrationDuration + NARRATION_TAIL_SECONDS)));
+    }
+  }, [narrationDuration]);
 
   // Animation Loop Effect
   useEffect(() => {
@@ -242,6 +256,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
           ref={narrationAudioRef}
           src={video.customVoiceAudioUrl}
           crossOrigin="anonymous"
+          onLoadedMetadata={(e: React.SyntheticEvent<HTMLAudioElement>) => setNarrationDuration(e.currentTarget.duration)}
         />
       )}
 
