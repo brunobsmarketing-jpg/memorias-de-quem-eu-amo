@@ -280,11 +280,21 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaption
         throw new Error('A renderização está demorando mais do que o esperado. Tente novamente em instantes.');
       }
 
+      // Baixa o arquivo via fetch e cria uma blob URL (mesma origem da página) antes de
+      // disparar o download. O mp4Url é do Supabase Storage (outra origem) — a maioria dos
+      // navegadores ignora o atributo "download" em links de origem diferente e só abre/
+      // reproduz o vídeo em vez de salvar o arquivo, o que fazia o download "não funcionar".
+      setRenderStatusLabel('Preparando arquivo para download...');
+      const videoBlob = await (await fetch(mp4Url)).blob();
+      const blobUrl = URL.createObjectURL(videoBlob);
+
       const a = document.createElement('a');
-      a.href = mp4Url;
+      a.href = blobUrl;
       a.download = `Memoria_${video.fatherName.replace(/\s+/g, '_')}.mp4`;
-      a.target = '_blank';
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
     } catch (e: any) {
       console.error(e);
       alert('Erro ao gerar o vídeo em MP4: ' + e.message);
@@ -330,8 +340,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaption
           </span>
         </div>
 
-        {/* Video Overlays Controls */}
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-6 z-20">
+        {/* Video Overlays Controls — sempre visíveis (não só no hover), já que celular não tem
+            hover persistente e os controles ficavam invisíveis/exigiam toque duplo no mobile */}
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent flex flex-col justify-between p-6 z-20">
           <div className="flex justify-end">
             <button
               onClick={handleMuteToggle}

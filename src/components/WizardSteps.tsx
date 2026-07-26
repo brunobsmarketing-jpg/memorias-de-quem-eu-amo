@@ -219,6 +219,12 @@ export const Step1UploadPhotos: React.FC<Step1UploadProps> = ({ photos, setPhoto
         </div>
       )}
 
+      {!aiOnlyMode && photos.length < 3 && (
+        <p className="text-xs text-amber-400/90 text-center">
+          Envie pelo menos 3 fotos para continuar (faltam {3 - photos.length}), ou escolha "Não tenho fotos boas" acima para usar só ilustrações de IA.
+        </p>
+      )}
+
       {/* Next Step */}
       <div className="flex justify-end pt-4">
         <button
@@ -737,6 +743,25 @@ export const Step3NarrationVoice: React.FC<Step3VoiceProps> = ({
         </div>
       )}
 
+      {(() => {
+        const stillWaiting =
+          !skipNarration &&
+          ((!isCustomVoice && (isGeneratingTTS || !customVoiceAudioUrl)) ||
+            (isCustomVoice && (isCloningVoice || !customVoiceAudioUrl)));
+
+        if (!stillWaiting) return null;
+        const message = isGeneratingTTS
+          ? 'Aguarde a narração terminar de gerar...'
+          : isCloningVoice
+          ? 'Aguarde a clonagem da sua voz terminar...'
+          : !isCustomVoice
+          ? 'Clique em uma das vozes acima para gerar a narração antes de continuar.'
+          : 'Grave sua voz e clique em "Clonar minha voz com IA" antes de continuar.';
+        return (
+          <p className="text-xs text-amber-400/90 text-center -mt-2">{message}</p>
+        );
+      })()}
+
       <div className="flex items-center justify-between pt-4">
         <button
           onClick={onBack}
@@ -746,7 +771,12 @@ export const Step3NarrationVoice: React.FC<Step3VoiceProps> = ({
         </button>
         <button
           onClick={onNext}
-          className="px-6 py-3 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-2"
+          disabled={
+            !skipNarration &&
+            ((!isCustomVoice && (isGeneratingTTS || !customVoiceAudioUrl)) ||
+              (isCustomVoice && (isCloningVoice || !customVoiceAudioUrl)))
+          }
+          className="px-6 py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-black font-bold rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-2"
         >
           Próximo Passo: Trilha Sonora
         </button>
@@ -1108,6 +1138,12 @@ export const Step5AIImagesOption: React.FC<Step5AIImagesProps> = ({
         </div>
       )}
 
+      {aiOnlyMode && aiImages.length < 3 && !isGenerating && (
+        <p className="text-xs text-amber-400/90 text-center -mt-2">
+          Gere pelo menos 3 ilustrações acima (faltam {3 - aiImages.length}) para continuar.
+        </p>
+      )}
+
       <div className="flex items-center justify-between pt-4">
         <button
           onClick={onBack}
@@ -1118,7 +1154,6 @@ export const Step5AIImagesOption: React.FC<Step5AIImagesProps> = ({
         <button
           onClick={onNext}
           disabled={isSubmitting || !canProceed}
-          title={aiOnlyMode && aiImages.length < 3 ? 'Gere pelo menos 3 ilustrações para continuar' : undefined}
           className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-50 text-black font-bold rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-2"
         >
           {isSubmitting ? (
