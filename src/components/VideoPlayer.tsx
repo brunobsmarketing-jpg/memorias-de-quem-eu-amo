@@ -25,6 +25,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaption
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const musicAudioRef = useRef<HTMLAudioElement | null>(null);
   const narrationAudioRef = useRef<HTMLAudioElement | null>(null);
+  // Relógio interno da prévia — vive num ref (não num state) porque precisa ser atualizado a
+  // cada frame sem disparar reconciliação do React a cada 33ms (era isso que causava
+  // travamento e desincronizava o áudio, que toca em tempo real independente do React).
+  const timeRef = useRef<number>(0);
+  const lastFrameTimestampRef = useRef<number | null>(null);
+  const lastStateSyncRef = useRef<number>(0);
 
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [isMuted, setIsMuted] = useState<boolean>(false);
@@ -113,79 +119,108 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaption
     }
   }, [narrationDuration]);
 
-  // Animation Loop Effect
-  useEffect(() => {
-    if (!isReady || preloadedImages.length === 0) return;
-
-    let animFrameId: number;
+  // Animation Loop Effect — desenha um frame a partir de "time" (segundos), sem depender do
+  // state currentTime (só usado pra exibir a barra de progresso, atualizado a uma taxa mais
+  // baixa logo abaixo).
+  const drawFrameAt = (time: number) => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || preloadedImages.length === 0) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     const totalSlides = preloadedImages.length;
     const slideDuration = duration / totalSlides;
 
-    const render = () => {
-      const time = currentTime;
+    const rawSlideIndex = Math.floor(time / slideDuration);
+    const currentSlideIndex = Math.min(rawSlideIndex, totalSlides - 1);
+    const nextSlideIndex = (currentSlideIndex + 1) % totalSlides;
 
-      // Determine current slide and next slide for fade transition
-      const rawSlideIndex = Math.floor(time / slideDuration);
-      const currentSlideIndex = Math.min(rawSlideIndex, totalSlides - 1);
-      const nextSlideIndex = (currentSlideIndex + 1) % totalSlides;
+    const slideTime = time % slideDuration;
+    const transitionTime = 1.2; // 1.2s cross-fade transition
+    let fadeProgress = 0;
 
-      const slideTime = time % slideDuration;
-      const transitionTime = 1.2; // 1.2s cross-fade transition
-      let fadeProgress = 0;
+    if (slideDuration - slideTime <= transitionTime && currentSlideIndex < totalSlides - 1) {
+      fadeProgress = (transitionTime - (slideDuration - slideTime)) / transitionTime;
+    }
 
-      if (slideDuration - slideTime <= transitionTime && currentSlideIndex < totalSlides - 1) {
-        fadeProgress = (transitionTime - (slideDuration - slideTime)) / transitionTime;
+    // Gentle Ken Burns zoom scale (from 1.0 to 1.12 over slide duration)
+    const zoomProgress = slideTime / slideDuration;
+    const zoomScale = 1.0 + zoomProgress * 0.12;
+
+    // Extract subtitle portion corresponding to current slide
+    const textSentences = (video.tributeText || 'Uma homenagem especial de quem te ama.').split(/(?<=[.!?])\s+/);
+    const subtitleIndex = Math.min(Math.floor((time / duration) * textSentences.length), textSentences.length - 1);
+    const currentSubtitle = textSentences[subtitleIndex] || video.tributeText;
+
+    drawVideoFrame(
+      ctx,
+      canvas.width,
+      canvas.height,
+      preloadedImages[currentSlideIndex] || null,
+      fadeProgress > 0 ? preloadedImages[nextSlideIndex] || null : null,
+      fadeProgress,
+      zoomScale,
+      currentSubtitle,
+      video.fatherName,
+      captionStyle
+    );
+  };
+
+  // Redesenha o frame atual (parado) sempre que algo visual mudar (legenda, imagens, etc.)
+  // mesmo sem estar tocando — sem isso, mudar o estilo de legenda só refletiria na próxima vez
+  // que desse play.
+  useEffect(() => {
+    if (!isReady || isPlaying) return;
+    drawFrameAt(timeRef.current);
+  }, [isReady, preloadedImages, captionStyle, duration, video]);
+
+  useEffect(() => {
+    if (!isPlaying || !isReady || preloadedImages.length === 0) return;
+
+    let animFrameId: number;
+    lastFrameTimestampRef.current = null;
+
+    const tick = (timestamp: number) => {
+      if (lastFrameTimestampRef.current === null) {
+        lastFrameTimestampRef.current = timestamp;
+      }
+      // Tempo real decorrido desde o último frame (não um incremento fixo assumido) — é isso
+      // que mantém a prévia sincronizada com o áudio, que toca no relógio real do navegador
+      // independente de quantos frames o React consegue desenhar por segundo.
+      const deltaSeconds = (timestamp - lastFrameTimestampRef.current) / 1000;
+      lastFrameTimestampRef.current = timestamp;
+
+      const next = timeRef.current + deltaSeconds;
+
+      if (next >= duration) {
+        timeRef.current = duration;
+        drawFrameAt(duration);
+        setCurrentTime(duration);
+        setIsPlaying(false);
+        musicAudioRef.current?.pause();
+        narrationAudioRef.current?.pause();
+        return;
       }
 
-      // Gentle Ken Burns zoom scale (from 1.0 to 1.12 over slide duration)
-      const zoomProgress = slideTime / slideDuration;
-      const zoomScale = 1.0 + zoomProgress * 0.12;
+      timeRef.current = next;
+      drawFrameAt(next);
 
-      // Extract subtitle portion corresponding to current slide
-      const textSentences = (video.tributeText || 'Uma homenagem especial de quem te ama.').split(/(?<=[.!?])\s+/);
-      const subtitleIndex = Math.min(Math.floor((time / duration) * textSentences.length), textSentences.length - 1);
-      const currentSubtitle = textSentences[subtitleIndex] || video.tributeText;
-
-      drawVideoFrame(
-        ctx,
-        canvas.width,
-        canvas.height,
-        preloadedImages[currentSlideIndex] || null,
-        fadeProgress > 0 ? preloadedImages[nextSlideIndex] || null : null,
-        fadeProgress,
-        zoomScale,
-        currentSubtitle,
-        video.fatherName,
-        captionStyle
-      );
-
-      if (isPlaying) {
-        setCurrentTime((prev) => {
-          const next = prev + 0.033; // ~30 FPS
-          if (next >= duration) {
-            setIsPlaying(false);
-            if (musicAudioRef.current) musicAudioRef.current.pause();
-            if (narrationAudioRef.current) narrationAudioRef.current.pause();
-            return 0;
-          }
-          return next;
-        });
+      // Só sincroniza o state (barra de progresso/contador) uns 10x por segundo — não precisa
+      // de mais que isso pra parecer fluido, e evita re-render do React a 60fps.
+      if (timestamp - lastStateSyncRef.current >= 100) {
+        lastStateSyncRef.current = timestamp;
+        setCurrentTime(next);
       }
 
-      animFrameId = requestAnimationFrame(render);
+      animFrameId = requestAnimationFrame(tick);
     };
 
-    render();
+    animFrameId = requestAnimationFrame(tick);
 
     return () => {
       cancelAnimationFrame(animFrameId);
     };
-  }, [isPlaying, currentTime, duration, isReady, preloadedImages, video, captionStyle]);
+  }, [isPlaying, duration, isReady, preloadedImages, video, captionStyle]);
 
   // Audio Playback Sync
   const togglePlay = () => {
@@ -207,6 +242,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaption
   };
 
   const handleRestart = () => {
+    timeRef.current = 0;
     setCurrentTime(0);
     setIsPlaying(true);
     if (musicAudioRef.current) {
