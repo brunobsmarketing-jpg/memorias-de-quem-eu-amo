@@ -658,8 +658,19 @@ Scene theme: ${prompt}`;
 // Gera o fundo ilustrado do cartão digital imprimível — paleta de azuis vivos (diferente do
 // tom laranja/pôr do sol usado nas ilustrações do vídeo), sem texto (o texto é desenhado
 // depois, por cima, no canvas do cliente).
+// A ilustração de fundo do cartão é genérica (não personalizada por usuário/vídeo), então
+// gerar ela via IA a cada visita à página do cartão é dinheiro jogado fora — cacheamos no
+// Supabase Storage num caminho fixo e reusamos pra sempre depois da primeira geração.
+const CARD_BACKGROUND_STORAGE_PATH = 'branding/card-background.png';
+
 app.post('/api/generate-card-background', async (req, res) => {
   try {
+    const { data: publicUrlData } = supabaseAdmin.storage.from(MEDIA_BUCKET).getPublicUrl(CARD_BACKGROUND_STORAGE_PATH);
+    const existingCheck = await fetch(publicUrlData.publicUrl, { method: 'HEAD' });
+    if (existingCheck.ok) {
+      return res.json({ imageUrl: publicUrlData.publicUrl, cached: true });
+    }
+
     const cardPrompt = `Elegant vertical greeting card background illustration for a Brazilian Father's Day (Dia dos Pais) tribute card.
 Style: modern flat illustration with soft gradients, festive and warm, clean vector-like shapes with gentle texture.
 Rules: NO text, NO letters, NO words, NO human faces anywhere in the image — purely decorative background and symbolic imagery.
@@ -675,21 +686,24 @@ Mood: celebratory, warm, loving, elegant.`;
     });
 
     const b64Image = response.data?.[0]?.b64_json;
-    const imageUrl = response.data?.[0]?.url;
+    const imageUrlFromOpenAI = response.data?.[0]?.url;
 
-    let finalDataUrl = '';
+    let buffer: Buffer;
     if (b64Image) {
-      finalDataUrl = `data:image/png;base64,${b64Image}`;
-    } else if (imageUrl) {
-      const imgFetch = await fetch(imageUrl);
-      const arrayBuf = await imgFetch.arrayBuffer();
-      const b64 = Buffer.from(arrayBuf).toString('base64');
-      finalDataUrl = `data:image/png;base64,${b64}`;
+      buffer = Buffer.from(b64Image, 'base64');
+    } else if (imageUrlFromOpenAI) {
+      const imgFetch = await fetch(imageUrlFromOpenAI);
+      buffer = Buffer.from(await imgFetch.arrayBuffer());
     } else {
       throw new Error('Nenhuma imagem foi retornada pela OpenAI.');
     }
 
-    res.json({ imageDataUrl: finalDataUrl });
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from(MEDIA_BUCKET)
+      .upload(CARD_BACKGROUND_STORAGE_PATH, buffer, { contentType: 'image/png', upsert: true });
+    if (uploadError) throw uploadError;
+
+    res.json({ imageUrl: publicUrlData.publicUrl, cached: false });
   } catch (error: any) {
     console.error('Erro ao gerar fundo do cartão:', error);
     res.status(500).json({ error: 'Falha ao gerar fundo do cartão', details: error.message });

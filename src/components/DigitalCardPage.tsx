@@ -12,6 +12,9 @@ interface DigitalCardPageProps {
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
+    // Necessário pra imagens de outra origem (ex: Supabase Storage) não "sujarem" o canvas —
+    // sem isso, canvas.toDataURL()/toBlob() falha com SecurityError mais adiante.
+    img.crossOrigin = 'anonymous';
     img.onload = () => resolve(img);
     img.onerror = () => reject(new Error('Falha ao carregar imagem'));
     img.src = src;
@@ -60,8 +63,8 @@ export const DigitalCardPage: React.FC<DigitalCardPageProps> = ({ video, onGoHom
     const response = await fetch('/api/generate-card-background', { method: 'POST' });
     if (!response.ok) throw new Error('Falha ao gerar a ilustração do cartão.');
     const data = await response.json();
-    cardBackgroundRef.current = data.imageDataUrl;
-    return data.imageDataUrl;
+    cardBackgroundRef.current = data.imageUrl;
+    return data.imageUrl;
   };
 
   const handleDownloadCardPDF = async () => {
@@ -76,8 +79,8 @@ export const DigitalCardPage: React.FC<DigitalCardPageProps> = ({ video, onGoHom
       // Fundo ilustrado gerado por IA (paleta de azuis vivos), com fallback para gradiente
       // simples caso a geração falhe.
       try {
-        const bgDataUrl = await getOrGenerateCardBackground();
-        const bgImg = await loadImage(bgDataUrl);
+        const bgUrl = await getOrGenerateCardBackground();
+        const bgImg = await loadImage(bgUrl);
         drawImageCover(ctx, bgImg, 1200, 1600);
       } catch (e) {
         console.warn('Não foi possível gerar a ilustração do cartão, usando fundo simples:', e);
