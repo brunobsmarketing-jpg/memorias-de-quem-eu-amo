@@ -1132,9 +1132,16 @@ export const Step5AIImagesOption: React.FC<Step5AIImagesProps> = ({
               {aiOnlyMode ? 'Gerar Ilustrações com IA' : 'SIM, gerar ilustrações com IA'}
             </h4>
           </div>
-          <p className="text-xs text-slate-400 leading-relaxed">
+          <p className="text-xs text-slate-400 leading-relaxed mb-3">
             A IA analisará seu texto e criará {imageCount} artes no estilo escolhido{aiOnlyMode ? ' para formar o seu vídeo' : ' para enriquecer a experiência visual'}.
           </p>
+          <button
+            type="button"
+            onClick={handleGenerateAIImages}
+            className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm rounded-xl shadow-md transition-transform active:scale-95"
+          >
+            Clique Aqui Para Gerar as Imagens
+          </button>
         </div>
       </div>
 
