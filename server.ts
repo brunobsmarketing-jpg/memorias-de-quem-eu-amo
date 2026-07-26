@@ -178,6 +178,46 @@ async function grantCreditsToUserByEmail(params: {
   return userRow;
 }
 
+/**
+ * Bloqueia o acesso de um usuário quando a compra é cancelada/estornada/chargeback —
+ * zera os créditos (não pode mais criar vídeos novos) e derruba o status de membro pago
+ * (não entra mais na área de membros). Vídeos já criados continuam existindo/acessíveis
+ * pelo link do cartão, só a criação de novos fica bloqueada.
+ */
+async function revokeAccessByEmail(email: string, reason: string) {
+  const normalizedEmail = String(email).trim().toLowerCase();
+
+  const { data: existing, error: findError } = await supabaseAdmin
+    .from('app_users')
+    .select('*')
+    .eq('email', normalizedEmail)
+    .maybeSingle();
+  if (findError) throw findError;
+  if (!existing) {
+    console.warn(`Webhook Payt: tentativa de bloquear e-mail não encontrado (${normalizedEmail}).`);
+    return null;
+  }
+
+  const { data: updated, error: updateError } = await supabaseAdmin
+    .from('app_users')
+    .update({ credits: 0, is_paid_member: false })
+    .eq('id', existing.id)
+    .select()
+    .single();
+  if (updateError) throw updateError;
+
+  await supabaseAdmin.from('payments').insert({
+    id: `tx_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    user_id: existing.id,
+    package_id: existing.plan_name || null,
+    amount_brl: null,
+    credits_added: 0,
+    status: reason,
+  });
+
+  return updated;
+}
+
 // Registra uma compra de créditos (checkout simulado por enquanto — será substituído
 // pelo webhook real da Payt). Cria a conta se não existir e soma os créditos comprados.
 app.post('/api/users/checkout', async (req, res) => {
@@ -194,7 +234,8 @@ app.post('/api/users/checkout', async (req, res) => {
   }
 });
 
-// Webhook (postback) da Payt — recebe a notificação de pagamento aprovado e libera os créditos.
+// Webhook (postback) da Payt — recebe a notificação de pagamento aprovado (libera créditos)
+// ou de cancelamento/chargeback/reembolso (bloqueia o acesso e zera os créditos).
 // FORMATO AINDA NÃO CONFIRMADO: por enquanto registra o payload bruto no log do servidor para
 // descobrirmos o formato real assim que a Payt enviar o primeiro evento de teste.
 app.post('/api/webhook/payt', async (req, res) => {
@@ -206,21 +247,32 @@ app.post('/api/webhook/payt', async (req, res) => {
 
     const payload = req.body || {};
     const eventStatus = String(payload.status || payload.event || payload.eventName || '').toLowerCase();
-    const isApproved = /aprovad|finalizad|approved|completed/.test(eventStatus);
-    if (!isApproved) {
-      console.log(`Webhook Payt ignorado (evento "${eventStatus}" não é de pagamento aprovado).`);
-      return;
-    }
-
     const email = payload.email || payload.customer?.email || payload.buyer?.email;
-    const name = payload.name || payload.customer?.name || payload.buyer?.name;
-    const packageId = payload.productId || payload.offerId || payload.product?.id;
-    const amountBRL = payload.amount || payload.total || payload.price;
 
     if (!email) {
       console.error('Webhook Payt: não foi possível identificar o e-mail do comprador no payload.');
       return;
     }
+
+    const isApproved = /aprovad|finalizad|approved|completed/.test(eventStatus);
+    // Cobre os eventos de "Cancelada - Chargeback", "Cancelada - Reembolsada" e
+    // "Solicitação de Reembolso" — qualquer um deles bloqueia o acesso imediatamente.
+    const isRevoked = /reembols|chargeback|estorn|refund|dispute/.test(eventStatus);
+
+    if (isRevoked) {
+      await revokeAccessByEmail(email, eventStatus || 'refunded');
+      console.log(`🚫 Acesso bloqueado via webhook Payt (evento "${eventStatus}") para ${email}`);
+      return;
+    }
+
+    if (!isApproved) {
+      console.log(`Webhook Payt ignorado (evento "${eventStatus}" não é de aprovação nem de reembolso).`);
+      return;
+    }
+
+    const name = payload.name || payload.customer?.name || payload.buyer?.name;
+    const packageId = payload.productId || payload.offerId || payload.product?.id;
+    const amountBRL = payload.amount || payload.total || payload.price;
 
     // TODO: mapear productId/offerId da Payt para a quantidade de créditos do pacote
     // correspondente (hoje fixo em 1, ajustar assim que soubermos os IDs reais dos produtos).
