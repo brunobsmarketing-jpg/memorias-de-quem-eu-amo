@@ -1,4 +1,29 @@
-import { PresetVoice, PresetTrack, CreditPackage, AIImageStyle } from '../types';
+import { PresetVoice, PresetTrack, CreditPackage, AIImageStyle, CaptionFontOption, CaptionColorOption, CaptionBackgroundOption } from '../types';
+
+// Tipografias disponíveis para a legenda queimada no vídeo final. "ttfFileName" aponta pra um
+// arquivo em assets/fonts/ (usado pelo FFmpeg via drawtext); "previewFontFamily" é a mesma fonte
+// carregada via Google Fonts (ver index.html) pra prévia em canvas bater com o vídeo final.
+export const CAPTION_FONTS: CaptionFontOption[] = [
+  { id: 'poppins', label: 'Moderna', previewFontFamily: 'Poppins', ttfFileName: 'Poppins-Bold.ttf' },
+  { id: 'fraunces', label: 'Elegante', previewFontFamily: 'Fraunces', ttfFileName: 'Fraunces-Variable.ttf' },
+  { id: 'playfair', label: 'Clássica', previewFontFamily: 'Playfair Display', ttfFileName: 'PlayfairDisplay-Variable.ttf' },
+  { id: 'caveat', label: 'Manuscrita', previewFontFamily: 'Caveat', ttfFileName: 'Caveat-Variable.ttf' },
+  { id: 'bebas', label: 'Impacto', previewFontFamily: 'Bebas Neue', ttfFileName: 'BebasNeue-Regular.ttf' },
+];
+
+export const CAPTION_COLORS: CaptionColorOption[] = [
+  { id: 'white', label: 'Branco', hex: '#FFFFFF' },
+  { id: 'cream', label: 'Marfim', hex: '#FDF6E3' },
+  { id: 'amber', label: 'Dourado', hex: '#FBBF24' },
+  { id: 'ember', label: 'Terracota', hex: '#C1666B' },
+  { id: 'black', label: 'Preto', hex: '#0F172A' },
+];
+
+export const CAPTION_BACKGROUNDS: CaptionBackgroundOption[] = [
+  { id: 'none', label: 'Sem Fundo', description: 'Só o texto, com contorno para legibilidade' },
+  { id: 'dark', label: 'Fundo Escuro', description: 'Caixa escura semitransparente (padrão)' },
+  { id: 'light', label: 'Fundo Claro', description: 'Caixa clara semitransparente' },
+];
 
 export const AI_IMAGE_STYLES: AIImageStyle[] = [
   {

@@ -29,13 +29,15 @@ const FALLBACK_THEMES: VisualTheme[] = [
 export async function extractVisualThemesFromText(
   text: string,
   fatherName: string,
-  count: number = 2
+  count: number = 2,
+  memoryAge: string = 'auto',
+  narratorGender: string = 'auto'
 ): Promise<VisualTheme[]> {
   try {
     const response = await fetch('/api/extract-visual-themes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, fatherName, count }),
+      body: JSON.stringify({ text, fatherName, count, memoryAge, narratorGender }),
     });
 
     if (!response.ok) {

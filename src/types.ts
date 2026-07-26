@@ -48,6 +48,31 @@ export interface AIImageStyle {
   description: string;
 }
 
+export interface CaptionFontOption {
+  id: string;
+  label: string;
+  previewFontFamily: string; // usada na prévia em canvas (fonte já carregada via Google Fonts)
+  ttfFileName: string; // arquivo dentro de assets/fonts/ usado pelo FFmpeg (drawtext) no vídeo final
+}
+
+export interface CaptionColorOption {
+  id: string;
+  label: string;
+  hex: string;
+}
+
+export interface CaptionBackgroundOption {
+  id: string;
+  label: string;
+  description: string;
+}
+
+export interface CaptionStyle {
+  fontId: string;
+  colorId: string;
+  backgroundId: string;
+}
+
 export interface AITextPromptData {
   fatherName: string;
   specialMemory: string;
@@ -69,6 +94,7 @@ export interface VideoJob {
   selectedTrackId: string;
   useAIImages: boolean;
   aiGeneratedImages: { prompt: string; url: string }[];
+  captionStyle?: CaptionStyle;
   status: 'draft' | 'processing' | 'watermarked' | 'unlocked';
   progress: number;
   watermarkVideoUrl?: string;

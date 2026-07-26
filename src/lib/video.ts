@@ -1,5 +1,5 @@
-import { VideoJob } from '../types';
-import { PRESET_TRACKS } from '../data/presets';
+import { VideoJob, CaptionStyle } from '../types';
+import { PRESET_TRACKS, CAPTION_FONTS, CAPTION_COLORS } from '../data/presets';
 
 export interface VideoRenderFrame {
   currentPhotoUrl: string;
@@ -27,6 +27,13 @@ export function getAllSlides(video: VideoJob): { id: string; url: string; title?
   return userPhotos;
 }
 
+function resolveCaptionPreviewStyle(captionStyle?: CaptionStyle) {
+  const fontOption = CAPTION_FONTS.find((f) => f.id === captionStyle?.fontId) || CAPTION_FONTS[0];
+  const colorOption = CAPTION_COLORS.find((c) => c.id === captionStyle?.colorId) || CAPTION_COLORS[0];
+  const backgroundId = captionStyle?.backgroundId || 'dark';
+  return { fontFamily: fontOption.previewFontFamily, colorHex: colorOption.hex, backgroundId };
+}
+
 // Draw a single HD frame on canvas with Ken Burns effect, fade transition, and subtitles
 export function drawVideoFrame(
   ctx: CanvasRenderingContext2D,
@@ -37,7 +44,8 @@ export function drawVideoFrame(
   fadeProgress: number,
   zoomScale: number,
   subtitleText: string,
-  fatherName: string
+  fatherName: string,
+  captionStyle?: CaptionStyle
 ) {
   // Clear canvas background
   ctx.fillStyle = '#0f172a';
@@ -89,6 +97,7 @@ export function drawVideoFrame(
 
   // Subtitle Overlay Card
   if (subtitleText) {
+    const style = resolveCaptionPreviewStyle(captionStyle);
     ctx.save();
     const padding = 40;
     const cardWidth = width - padding * 2;
@@ -96,19 +105,24 @@ export function drawVideoFrame(
     const cardX = padding;
     const cardY = height - cardHeight - 80;
 
-    // Dark glass background
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-    ctx.lineWidth = 2;
+    if (style.backgroundId !== 'none') {
+      ctx.fillStyle = style.backgroundId === 'light' ? 'rgba(255, 255, 255, 0.85)' : 'rgba(15, 23, 42, 0.85)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.lineWidth = 2;
 
-    ctx.beginPath();
-    ctx.roundRect ? ctx.roundRect(cardX, cardY, cardWidth, cardHeight, 20) : ctx.fillRect(cardX, cardY, cardWidth, cardHeight);
-    ctx.fill();
-    ctx.stroke();
+      ctx.beginPath();
+      ctx.roundRect ? ctx.roundRect(cardX, cardY, cardWidth, cardHeight, 20) : ctx.fillRect(cardX, cardY, cardWidth, cardHeight);
+      ctx.fill();
+      ctx.stroke();
+    }
 
     // Subtitle text
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '600 32px "Plus Jakarta Sans", sans-serif';
+    ctx.fillStyle = style.colorHex;
+    if (style.backgroundId === 'none') {
+      ctx.shadowColor = 'rgba(0,0,0,0.85)';
+      ctx.shadowBlur = 8;
+    }
+    ctx.font = `600 32px "${style.fontFamily}", sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 

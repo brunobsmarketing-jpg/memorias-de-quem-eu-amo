@@ -3,7 +3,8 @@ import ffmpegStaticPath from 'ffmpeg-static';
 import fs from 'fs';
 import path from 'path';
 import { spawn } from 'child_process';
-import { PRESET_TRACKS } from '../data/presets';
+import { PRESET_TRACKS, CAPTION_FONTS, CAPTION_COLORS } from '../data/presets';
+import { CaptionStyle } from '../types';
 
 // O binário do pacote ffmpeg-static no Linux (usado em produção) não inclui o filtro
 // drawtext. O build de produção baixa um binário completo (com drawtext) para
@@ -26,6 +27,7 @@ export interface RenderVideoParams {
   tributeText: string;
   narrationAudioDataUrl?: string;
   selectedTrackId?: string;
+  captionStyle?: CaptionStyle;
 }
 
 // 24fps é suficiente para slides estáticos (sem zoom contínuo) e reduz o trabalho de codificação.
@@ -33,9 +35,34 @@ const FPS = 24;
 const MIN_DURATION = 20;
 const MAX_DURATION = 75;
 const NARRATION_TAIL_SECONDS = 1.5;
-// Fonte empacotada no próprio projeto (assets/fonts) em vez de um caminho do sistema operacional —
+// Fontes empacotadas no próprio projeto (assets/fonts) em vez de um caminho do sistema operacional —
 // um caminho como "C:/Windows/Fonts/arial.ttf" não existiria no Linux do servidor de produção.
-const FONT_PATH = path.join(process.cwd(), 'assets', 'fonts', 'Poppins-Bold.ttf');
+// O título fixo do vídeo sempre usa a fonte padrão (Poppins); a legenda usa a tipografia
+// escolhida pelo usuário (ver resolveCaptionStyle).
+// IMPORTANTE: caminho RELATIVO (não process.cwd() + absoluto) de propósito — no Windows, um
+// caminho absoluto tem ":" no drive letter (ex: "C:/Users/..."), que precisa ser escapado pro
+// parser de filtros do FFmpeg não quebrar (ver quoteFilterPath); mas esse escape faz o parâmetro
+// "fontfile" falhar silenciosamente ao abrir a fonte de verdade e cair numa fonte padrão do
+// sistema. Caminho relativo nunca tem esse ":", então nunca precisa do escape — resolve certo
+// tanto no FFmpeg local (Windows) quanto em produção (Linux), já que o processo do FFmpeg roda
+// com o mesmo diretório de trabalho do servidor Node (a raiz do projeto).
+const TITLE_FONT_PATH = path.join('assets', 'fonts', 'Poppins-Bold.ttf');
+
+function hexToFFmpegColor(hex: string): string {
+  return `0x${hex.replace('#', '')}`;
+}
+
+function resolveCaptionStyle(captionStyle?: CaptionStyle) {
+  const fontOption = CAPTION_FONTS.find((f) => f.id === captionStyle?.fontId) || CAPTION_FONTS[0];
+  const colorOption = CAPTION_COLORS.find((c) => c.id === captionStyle?.colorId) || CAPTION_COLORS[0];
+  const backgroundId = captionStyle?.backgroundId || 'dark';
+
+  return {
+    fontPath: path.join('assets', 'fonts', fontOption.ttfFileName),
+    fontColor: hexToFFmpegColor(colorOption.hex),
+    backgroundId,
+  };
+}
 
 function saveBase64ToTempFile(dataUrl: string, prefix: string, ext: string): string {
   const tempDir = path.join(process.cwd(), 'public', 'renders', 'temp');
@@ -276,12 +303,21 @@ export async function renderVideoWithFFmpeg(params: RenderVideoParams): Promise<
       const titleTextPath = writeTempTextFile(`Homenagem para ${params.fatherName || 'Meu Pai'}`, 'title');
       tempFilesToDelete.push(titleTextPath);
       filters.push(
-        `[${videoLabel}]drawtext=textfile=${quoteFilterPath(titleTextPath)}:fontfile=${quoteFilterPath(FONT_PATH)}:` +
+        `[${videoLabel}]drawtext=textfile=${quoteFilterPath(titleTextPath)}:fontfile=${quoteFilterPath(TITLE_FONT_PATH)}:` +
         `fontsize=46:fontcolor=white:borderw=3:bordercolor=black@0.6:x=(w-text_w)/2:y=70[vtitle]`
       );
       videoLabel = 'vtitle';
 
-      // --- Legendas queimadas, sincronizadas por trecho do texto ---
+      // --- Legendas queimadas, sincronizadas por trecho do texto, com a tipografia/cor/fundo
+      // escolhidos pelo usuário no wizard ---
+      const caption = resolveCaptionStyle(params.captionStyle);
+      const captionBoxParams =
+        caption.backgroundId === 'none'
+          ? 'borderw=3:bordercolor=black@0.7'
+          : caption.backgroundId === 'light'
+          ? 'box=1:boxcolor=white@0.75:boxborderw=24'
+          : 'box=1:boxcolor=black@0.55:boxborderw=24';
+
       const sentences = splitIntoSentences(params.tributeText);
       if (sentences.length > 0) {
         const perChunk = totalDuration / sentences.length;
@@ -293,8 +329,8 @@ export async function renderVideoWithFFmpeg(params: RenderVideoParams): Promise<
           tempFilesToDelete.push(subPath);
           const outLabel = `vsub${idx}`;
           filters.push(
-            `[${videoLabel}]drawtext=textfile=${quoteFilterPath(subPath)}:fontfile=${quoteFilterPath(FONT_PATH)}:` +
-            `fontsize=42:fontcolor=white:line_spacing=8:box=1:boxcolor=black@0.55:boxborderw=24:` +
+            `[${videoLabel}]drawtext=textfile=${quoteFilterPath(subPath)}:fontfile=${quoteFilterPath(caption.fontPath)}:` +
+            `fontsize=42:fontcolor=${caption.fontColor}:line_spacing=8:${captionBoxParams}:` +
             `x=(w-text_w)/2:y=h-300:enable='between(t,${start.toFixed(2)},${end.toFixed(2)})'[${outLabel}]`
           );
           videoLabel = outLabel;

@@ -30,7 +30,8 @@ create table if not exists video_jobs (
   unlocked_video_url text,
   card_url text,
   created_at timestamptz not null default now(),
-  duration_seconds integer not null default 30
+  duration_seconds integer not null default 30,
+  caption_style jsonb
 );
 
 create table if not exists payments (

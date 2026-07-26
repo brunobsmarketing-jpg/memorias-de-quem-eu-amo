@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Sparkles, ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react';
-import { PhotoItem, VideoJob, User } from '../types';
+import { PhotoItem, VideoJob, User, CaptionStyle } from '../types';
 import {
   Step1UploadPhotos,
   Step2TextTribute,
@@ -43,6 +43,8 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
   const [useAIImages, setUseAIImages] = useState<boolean>(false);
   const [aiImages, setAiImages] = useState<{ prompt: string; url: string }[]>([]);
   const [selectedImageStyle, setSelectedImageStyle] = useState<string>('watercolor');
+  const [memoryAge, setMemoryAge] = useState<string>('auto');
+  const [narratorGender, setNarratorGender] = useState<string>('auto');
 
   // Created Draft Job
   const [createdJob, setCreatedJob] = useState<VideoJob | null>(null);
@@ -227,6 +229,10 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
             aiOnlyMode={aiOnlyMode}
             selectedImageStyle={selectedImageStyle}
             setSelectedImageStyle={setSelectedImageStyle}
+            memoryAge={memoryAge}
+            setMemoryAge={setMemoryAge}
+            narratorGender={narratorGender}
+            setNarratorGender={setNarratorGender}
             onNext={handleGeneratePreviewJob}
             onBack={() => setCurrentStep(4)}
             isSubmitting={isGeneratingJob}
@@ -248,7 +254,16 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
               </p>
             </div>
 
-            <VideoPlayer video={createdJob} />
+            <VideoPlayer
+              video={createdJob}
+              editableCaptionStyle
+              onCaptionStyleChange={(style: CaptionStyle) => {
+                setCreatedJob((prev) => (prev ? { ...prev, captionStyle: style } : prev));
+                saveVideoJobRemote({ ...createdJob, captionStyle: style }).catch((err) =>
+                  console.warn('Falha ao salvar estilo de legenda no servidor:', err)
+                );
+              }}
+            />
 
             {isSyncing && (
               <div className="p-3 bg-slate-800/80 rounded-xl border border-slate-700 text-slate-300 text-xs font-semibold flex items-center justify-center gap-2">

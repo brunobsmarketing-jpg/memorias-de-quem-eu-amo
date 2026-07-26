@@ -1,19 +1,27 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Play, Pause, RotateCcw, Volume2, VolumeX, Download, CheckCircle2 } from 'lucide-react';
-import { VideoJob } from '../types';
+import { VideoJob, CaptionStyle } from '../types';
 import { drawVideoFrame, getAllSlides } from '../lib/video';
-import { PRESET_TRACKS } from '../data/presets';
+import { PRESET_TRACKS, CAPTION_FONTS, CAPTION_COLORS, CAPTION_BACKGROUNDS } from '../data/presets';
 import { fetchVideoJobRemote } from '../lib/videoApi';
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+const DEFAULT_CAPTION_STYLE: CaptionStyle = {
+  fontId: CAPTION_FONTS[0].id,
+  colorId: CAPTION_COLORS[0].id,
+  backgroundId: 'dark',
+};
+
 interface VideoPlayerProps {
   video: VideoJob;
+  editableCaptionStyle?: boolean;
+  onCaptionStyleChange?: (style: CaptionStyle) => void;
 }
 
-export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
+export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaptionStyle = false, onCaptionStyleChange }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const musicAudioRef = useRef<HTMLAudioElement | null>(null);
   const narrationAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -28,6 +36,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
   const [isReady, setIsReady] = useState<boolean>(false);
   const [isRecordingExport, setIsRecordingExport] = useState<boolean>(false);
   const [renderStatusLabel, setRenderStatusLabel] = useState<string>('');
+  const [captionStyle, setCaptionStyle] = useState<CaptionStyle>(video.captionStyle || DEFAULT_CAPTION_STYLE);
+
+  const updateCaptionStyle = (partial: Partial<CaptionStyle>) => {
+    setCaptionStyle((prev) => {
+      const next = { ...prev, ...partial };
+      onCaptionStyleChange?.(next);
+      return next;
+    });
+  };
 
   // Load slides and images
   useEffect(() => {
@@ -143,7 +160,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
         fadeProgress,
         zoomScale,
         currentSubtitle,
-        video.fatherName
+        video.fatherName,
+        captionStyle
       );
 
       if (isPlaying) {
@@ -167,7 +185,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
     return () => {
       cancelAnimationFrame(animFrameId);
     };
-  }, [isPlaying, currentTime, duration, isReady, preloadedImages, video]);
+  }, [isPlaying, currentTime, duration, isReady, preloadedImages, video, captionStyle]);
 
   // Audio Playback Sync
   const togglePlay = () => {
@@ -227,6 +245,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
           tributeText: video.tributeText,
           narrationAudioDataUrl: video.customVoiceAudioUrl,
           selectedTrackId: video.selectedTrackId,
+          captionStyle,
         }),
       });
 
@@ -356,6 +375,73 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
           </div>
         </div>
       </div>
+
+      {/* Personalização da Legenda */}
+      {editableCaptionStyle && (
+        <div className="w-full max-w-lg mt-5 space-y-3 bg-slate-900 border border-slate-800 rounded-2xl p-4">
+          <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Estilo da Legenda</h4>
+
+          <div className="space-y-1.5">
+            <p className="text-[11px] text-slate-500 font-semibold">Tipografia</p>
+            <div className="grid grid-cols-5 gap-1.5">
+              {CAPTION_FONTS.map((font) => (
+                <button
+                  key={font.id}
+                  onClick={() => updateCaptionStyle({ fontId: font.id })}
+                  className={`py-2 rounded-lg border text-[11px] font-bold transition-all ${
+                    captionStyle.fontId === font.id
+                      ? 'bg-amber-500/20 border-amber-500 text-amber-300 ring-1 ring-amber-500'
+                      : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-slate-600'
+                  }`}
+                  style={{ fontFamily: `"${font.previewFontFamily}", sans-serif` }}
+                >
+                  {font.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <p className="text-[11px] text-slate-500 font-semibold">Cor do Texto</p>
+            <div className="grid grid-cols-5 gap-1.5">
+              {CAPTION_COLORS.map((color) => (
+                <button
+                  key={color.id}
+                  onClick={() => updateCaptionStyle({ colorId: color.id })}
+                  title={color.label}
+                  className={`h-9 rounded-lg border flex items-center justify-center transition-all ${
+                    captionStyle.colorId === color.id
+                      ? 'border-amber-500 ring-1 ring-amber-500'
+                      : 'border-slate-700 hover:border-slate-600'
+                  }`}
+                  style={{ backgroundColor: '#1e293b' }}
+                >
+                  <span className="w-4 h-4 rounded-full border border-white/20" style={{ backgroundColor: color.hex }} />
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <p className="text-[11px] text-slate-500 font-semibold">Fundo da Legenda</p>
+            <div className="grid grid-cols-3 gap-1.5">
+              {CAPTION_BACKGROUNDS.map((bg) => (
+                <button
+                  key={bg.id}
+                  onClick={() => updateCaptionStyle({ backgroundId: bg.id })}
+                  className={`py-2 rounded-lg border text-[11px] font-bold transition-all ${
+                    captionStyle.backgroundId === bg.id
+                      ? 'bg-amber-500/20 border-amber-500 text-amber-300 ring-1 ring-amber-500'
+                      : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-slate-600'
+                  }`}
+                >
+                  {bg.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Action Buttons */}
       <div className="w-full max-w-lg mt-5 flex flex-col gap-3">

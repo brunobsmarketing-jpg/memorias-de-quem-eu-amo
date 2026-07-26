@@ -855,10 +855,27 @@ interface Step5AIImagesProps {
   aiOnlyMode: boolean;
   selectedImageStyle: string;
   setSelectedImageStyle: (id: string) => void;
+  memoryAge: string;
+  setMemoryAge: (id: string) => void;
+  narratorGender: string;
+  setNarratorGender: (id: string) => void;
   onNext: () => void;
   onBack: () => void;
   isSubmitting?: boolean;
 }
+
+const MEMORY_AGE_OPTIONS = [
+  { id: 'auto', label: 'IA decide', emoji: '✨' },
+  { id: 'child', label: 'Criança', emoji: '🧒' },
+  { id: 'teen', label: 'Adolescente', emoji: '🧑' },
+  { id: 'adult', label: 'Adulto(a)', emoji: '🧑‍🦱' },
+];
+
+const NARRATOR_GENDER_OPTIONS = [
+  { id: 'auto', label: 'IA decide', emoji: '✨' },
+  { id: 'female', label: 'Filha', emoji: '👧' },
+  { id: 'male', label: 'Filho', emoji: '👦' },
+];
 
 export const Step5AIImagesOption: React.FC<Step5AIImagesProps> = ({
   useAIImages,
@@ -870,6 +887,10 @@ export const Step5AIImagesOption: React.FC<Step5AIImagesProps> = ({
   aiOnlyMode,
   selectedImageStyle,
   setSelectedImageStyle,
+  memoryAge,
+  setMemoryAge,
+  narratorGender,
+  setNarratorGender,
   onNext,
   onBack,
   isSubmitting = false,
@@ -883,7 +904,7 @@ export const Step5AIImagesOption: React.FC<Step5AIImagesProps> = ({
     setUseAIImages(true);
     setGeneratingProgress(0);
     try {
-      const themes = await extractVisualThemesFromText(tributeText, fatherName, imageCount);
+      const themes = await extractVisualThemesFromText(tributeText, fatherName, imageCount, memoryAge, narratorGender);
       setGeneratingProgress(1); // temas extraídos
 
       const generatedList = await Promise.all(
@@ -938,6 +959,54 @@ export const Step5AIImagesOption: React.FC<Step5AIImagesProps> = ({
               <p className="text-[10px] text-slate-500 mt-0.5 leading-tight hidden sm:block">{style.description}</p>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Contexto da Cena — de quem é a lembrança, pra silhueta ao lado do pai combinar
+          com a história real em vez de uma criança genérica */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider text-center">
+            Quem está homenageando
+          </h4>
+          <div className="grid grid-cols-3 gap-2">
+            {NARRATOR_GENDER_OPTIONS.map((opt) => (
+              <div
+                key={opt.id}
+                onClick={() => setNarratorGender(opt.id)}
+                className={`p-2.5 rounded-xl border cursor-pointer text-center transition-all ${
+                  narratorGender === opt.id
+                    ? 'bg-amber-500/20 border-amber-500 ring-1 ring-amber-500'
+                    : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+                }`}
+              >
+                <div className="text-lg">{opt.emoji}</div>
+                <p className="text-[11px] font-bold text-slate-100 mt-0.5">{opt.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider text-center">
+            Fase da lembrança
+          </h4>
+          <div className="grid grid-cols-4 gap-2">
+            {MEMORY_AGE_OPTIONS.map((opt) => (
+              <div
+                key={opt.id}
+                onClick={() => setMemoryAge(opt.id)}
+                className={`p-2.5 rounded-xl border cursor-pointer text-center transition-all ${
+                  memoryAge === opt.id
+                    ? 'bg-amber-500/20 border-amber-500 ring-1 ring-amber-500'
+                    : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+                }`}
+              >
+                <div className="text-lg">{opt.emoji}</div>
+                <p className="text-[10px] font-bold text-slate-100 mt-0.5 leading-tight">{opt.label}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 

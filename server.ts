@@ -410,9 +410,17 @@ app.post('/api/videos', async (req, res) => {
       card_url: job.cardUrl,
       created_at: job.createdAt,
       duration_seconds: job.durationSeconds,
+      caption_style: job.captionStyle || null,
     };
 
-    const { error } = await supabaseAdmin.from('video_jobs').upsert(row, { onConflict: 'id' });
+    let { error } = await supabaseAdmin.from('video_jobs').upsert(row, { onConflict: 'id' });
+    if (error && /caption_style/.test(error.message || '')) {
+      // Coluna ainda não existe no banco (rodar supabase_schema.sql atualizado) — salva sem
+      // o estilo de legenda em vez de quebrar o salvamento do vídeo inteiro.
+      console.warn('Coluna caption_style ausente no Supabase — salvando vídeo sem o estilo de legenda.');
+      const { caption_style, ...rowWithoutCaptionStyle } = row;
+      ({ error } = await supabaseAdmin.from('video_jobs').upsert(rowWithoutCaptionStyle, { onConflict: 'id' }));
+    }
     if (error) throw error;
 
     res.json({ success: true });
@@ -457,6 +465,7 @@ app.get('/api/videos/:id', async (req, res) => {
         cardUrl: data.card_url,
         createdAt: data.created_at,
         durationSeconds: data.duration_seconds,
+        captionStyle: data.caption_style || undefined,
       },
     });
   } catch (error: any) {
@@ -508,15 +517,40 @@ DIRETRIZES DE ESTILO E CRIATIVIDADE (MUITO IMPORTANTE):
 // 2. Extract visual prompts for illustrative scenes
 app.post('/api/extract-visual-themes', async (req, res) => {
   try {
-    const { text, fatherName, count } = req.body;
+    const { text, fatherName, count, memoryAge, narratorGender } = req.body;
     if (!text) {
       return res.status(400).json({ error: 'Texto não fornecido' });
     }
     const sceneCount = Math.max(1, Math.min(8, Number(count) || 2));
 
+    // Contexto de quem está homenageando (filho/filha) e a fase da vida das lembranças
+    // (infância/adolescência/vida adulta) — usado para que a silhueta ao lado do pai nas
+    // ilustrações combine com a história real, em vez de uma criança genérica e ambígua.
+    // "auto" (padrão) deixa a IA inferir isso a partir do próprio texto da homenagem.
+    const ageLabels: Record<string, string> = {
+      child: 'uma criança pequena (por volta de 5 a 10 anos)',
+      teen: 'um(a) adolescente (por volta de 13 a 17 anos)',
+      adult: 'um(a) filho(a) já adulto(a)',
+    };
+    const genderLabels: Record<string, string> = {
+      male: 'do sexo masculino (um filho/menino)',
+      female: 'do sexo feminino (uma filha/menina)',
+    };
+
+    const contextInstruction =
+      memoryAge && memoryAge !== 'auto' && genderLabels[narratorGender]
+        ? `A pessoa homenageando o pai é ${genderLabels[narratorGender] || 'de gênero não especificado'}, e a lembrança retratada é de quando essa pessoa era ${ageLabels[memoryAge] || 'de idade não especificada'}. Use essas características para desenhar a silhueta/figura que acompanha o pai nas cenas (altura, proporções e presença condizentes).`
+        : memoryAge && memoryAge !== 'auto'
+        ? `A lembrança retratada é de quando a pessoa homenageando o pai era ${ageLabels[memoryAge] || 'de idade não especificada'}. Use isso para definir a proporção/altura da silhueta que acompanha o pai nas cenas.`
+        : narratorGender && narratorGender !== 'auto'
+        ? `A pessoa homenageando o pai é ${genderLabels[narratorGender] || 'de gênero não especificado'}. Use isso para definir a silhueta que acompanha o pai nas cenas.`
+        : `Infira pelo próprio texto da homenagem, se houver pistas (idade mencionada, "filho"/"filha", "menina"/"menino" etc.), a idade aproximada e o gênero da pessoa que está homenageando o pai nas lembranças, e use isso para desenhar a silhueta que acompanha o pai. Se não houver nenhuma pista no texto, use uma silhueta neutra/ambígua de criança.`;
+
     const prompt = `Analise o texto de homenagem de Dia dos Pais a seguir e extraia exatamente ${sceneCount} cenas visuais e poéticas para ilustrações.
 
 Texto: "${text}"
+
+${contextInstruction}
 
 Retorne um JSON com a lista de ${sceneCount} descrições visuais em inglês para geração de arte, com cenas diferentes entre si. As ilustrações NUNCA devem tentar simular fotos de pessoas reais específicas, mas sim conceitos simbólicos calorosos (ex: silhueta de pai e criança de mãos dadas ao pôr do sol, casa acolhedora com luz suave, árvore de carvalho forte simbolizando proteção).`;
 
@@ -802,7 +836,7 @@ app.post('/api/clone-voice', async (req, res) => {
 // minutos quando há fila (ver RenderQueue acima), o que arriscaria timeout no proxy em
 // picos de tráfego.
 app.post('/api/render-video', async (req, res) => {
-  const { videoId, fatherName, photos, aiImages, useAIImages, tributeText, narrationAudioDataUrl, selectedTrackId } = req.body;
+  const { videoId, fatherName, photos, aiImages, useAIImages, tributeText, narrationAudioDataUrl, selectedTrackId, captionStyle } = req.body;
 
   if (!photos || photos.length === 0) {
     return res.status(400).json({ error: 'Fotos são obrigatórias para renderizar o vídeo.' });
@@ -829,6 +863,7 @@ app.post('/api/render-video', async (req, res) => {
         tributeText: tributeText || '',
         narrationAudioDataUrl,
         selectedTrackId,
+        captionStyle,
       });
     });
 
