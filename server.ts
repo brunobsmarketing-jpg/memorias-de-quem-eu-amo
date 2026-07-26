@@ -628,6 +628,9 @@ Scene theme: ${prompt}`;
       prompt: fullPrompt,
       n: 1,
       size: '1024x1024',
+      // Sem isso, o parâmetro fica em "auto" e a API pode escolher qualidade "high" (até ~4x
+      // mais caro que "medium") sem avisar — trava o custo num teto previsível por imagem.
+      quality: 'medium',
     });
 
     const b64Image = response.data?.[0]?.b64_json;
@@ -683,6 +686,7 @@ Mood: celebratory, warm, loving, elegant.`;
       prompt: cardPrompt,
       n: 1,
       size: '1024x1536',
+      quality: 'medium',
     });
 
     const b64Image = response.data?.[0]?.b64_json;
