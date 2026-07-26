@@ -429,6 +429,16 @@ export const Step2TextTribute: React.FC<Step2TextProps> = ({
         />
       </div>
 
+      {(!fatherName || !tributeText.trim()) && (
+        <p className="text-xs text-amber-400/90 text-center -mt-2">
+          {!fatherName && !tributeText.trim()
+            ? 'Preencha o nome do pai e escreva (ou gere com IA) o texto da homenagem para continuar.'
+            : !fatherName
+            ? 'Preencha o nome do pai para continuar.'
+            : 'Escreva seu texto ou clique em "Criar Homenagem Emocionante com IA" para continuar.'}
+        </p>
+      )}
+
       <div className="flex items-center justify-between pt-4">
         <button
           onClick={onBack}
