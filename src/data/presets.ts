@@ -60,6 +60,7 @@ export const AI_IMAGE_STYLES: AIImageStyle[] = [
 
 // Vozes com sotaque brasileiro (melhor pra narrar português do que as vozes em inglês
 // americano usadas antes) — IDs reais da nossa conta ElevenLabs, confirmados via API.
+// 10 vozes ao todo: 5 masculinas + 5 femininas, mesclando tons jovens e de meia-idade.
 export const PRESET_VOICES: PresetVoice[] = [
   {
     id: 'voice-1',
@@ -102,6 +103,34 @@ export const PRESET_VOICES: PresetVoice[] = [
     gender: 'female',
     tone: 'Calma e próxima',
     elevenLabsVoiceId: 'QHXbC1UI61ujIZ9SUNGc', // Regi Piroli
+  },
+  {
+    id: 'voice-7',
+    name: 'Kpelo — Voz Calma e Mentora',
+    gender: 'male',
+    tone: 'Calma e confiante, meia-idade',
+    elevenLabsVoiceId: '8BWp4523yEDDjOJi73mz', // Kpelo - Natural & Calm
+  },
+  {
+    id: 'voice-8',
+    name: 'Zeus — Voz Jovem de Contador de Histórias',
+    gender: 'male',
+    tone: 'Calorosa e envolvente, jovem',
+    elevenLabsVoiceId: '1uHvkX3FWSXAsmP9RhiK', // Zeus - Warm Storyteller
+  },
+  {
+    id: 'voice-9',
+    name: 'Miguel — Voz Profunda e Emotiva',
+    gender: 'male',
+    tone: 'Profunda e cinematográfica, meia-idade',
+    elevenLabsVoiceId: 'CnEjAO8AoeKlqOCv9Ink', // Miguel - Deep, Emotional & Cinematic
+  },
+  {
+    id: 'voice-10',
+    name: 'Lucas — Voz Jovem e Natural',
+    gender: 'male',
+    tone: 'Natural e clara, jovem',
+    elevenLabsVoiceId: 'R1FbOy3y7r4840b0cKEC', // Lucas - Português BR
   },
 ];
 
