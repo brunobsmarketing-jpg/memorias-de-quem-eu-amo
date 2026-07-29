@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sparkles, ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react';
 import { PhotoItem, VideoJob, User, CaptionStyle } from '../types';
 import {
@@ -28,6 +28,12 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
   onCancel,
 }) => {
   const [currentStep, setCurrentStep] = useState<number>(1);
+
+  // Ao trocar de etapa (principalmente no celular), garante que a pessoa veja
+  // o topo da nova etapa em vez de continuar na posição de rolagem da etapa anterior.
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentStep]);
 
   // Form States
   const [photos, setPhotos] = useState<PhotoItem[]>([]);

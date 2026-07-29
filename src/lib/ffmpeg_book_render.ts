@@ -116,8 +116,17 @@ export async function renderMemoryBookWithFFmpeg(params: RenderMemoryBookParams)
     return new Promise((resolve, reject) => {
       const command = ffmpeg();
 
+      // Importante: aqui NÃO limitamos a entrada com "-t pageDuration" como no slideshow simples
+      // (ffmpeg_render.ts) — como cada página passa pelo zoompan (Ken Burns) logo abaixo, um
+      // "-t" na entrada faz o ffmpeg pré-gerar ~framesPerPage cópias do frame estático, e o
+      // zoompan então gera framesPerPage frames de SAÍDA pra cada uma delas — multiplicando a
+      // duração real de cada página muito além do pretendido. Isso desalinha os offsets do
+      // xfade calculados a partir de pageDuration, fazendo a página 0 "engolir" o vídeo inteiro
+      // e as demais páginas some/repetirem fora de ordem no resultado final. O zoompan já define
+      // a duração exata da página sozinho via d=framesPerPage e fps=FPS, então a entrada só
+      // precisa ficar em loop infinito de um único frame.
       pageTempPaths.forEach((imgPath) => {
-        command.input(imgPath).inputOptions(['-loop 1', `-t ${pageDuration.toFixed(3)}`]);
+        command.input(imgPath).inputOptions(['-loop 1']);
       });
 
       let narrationInputIndex = -1;

@@ -114,6 +114,10 @@ export interface PageTemplateSlot {
   height: number; // fração 0-1
   rotationDeg?: number;
   shape?: BookSlotShape;
+  // Quando true, x/y/width/height viram um limite máximo: a foto é encaixada dentro desse
+  // espaço preservando sua proporção original (sem cortar), em vez de esticar/cortar pra
+  // preencher a caixa inteira — usada em templates onde a foto pode ser retrato ou paisagem.
+  adaptiveFit?: boolean;
 }
 
 export interface PageTemplateTextBlock {

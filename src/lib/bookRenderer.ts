@@ -67,12 +67,33 @@ async function drawSlotPhoto(
   canvasWidth: number,
   canvasHeight: number
 ) {
-  const x = slot.x * canvasWidth;
-  const y = slot.y * canvasHeight;
-  const w = slot.width * canvasWidth;
-  const h = slot.height * canvasHeight;
+  const maxX = slot.x * canvasWidth;
+  const maxY = slot.y * canvasHeight;
+  const maxW = slot.width * canvasWidth;
+  const maxH = slot.height * canvasHeight;
 
   const img = await loadImage(photoUrl);
+
+  // Espaços "adaptiveFit" tratam x/y/width/height como limite máximo: a foto é encaixada
+  // preservando a proporção original (retrato ou paisagem), em vez de cortada pra preencher
+  // uma caixa de proporção fixa — o quadro (ex: moldura de polaroid) acompanha esse tamanho.
+  let x = maxX;
+  let y = maxY;
+  let w = maxW;
+  let h = maxH;
+  if (slot.adaptiveFit) {
+    const imgAspect = img.width / img.height;
+    const maxAspect = maxW / maxH;
+    if (imgAspect > maxAspect) {
+      w = maxW;
+      h = maxW / imgAspect;
+    } else {
+      h = maxH;
+      w = maxH * imgAspect;
+    }
+    x = maxX + (maxW - w) / 2;
+    y = maxY + (maxH - h) / 2;
+  }
 
   ctx.save();
   const centerX = x + w / 2;

@@ -123,7 +123,7 @@ export const BOOK_PAGE_TEMPLATES: PageTemplateDef[] = [
     canvasWidth: BOOK_PAGE_WIDTH,
     canvasHeight: BOOK_PAGE_HEIGHT,
     backgroundColor: '#fdf6e9',
-    slots: [{ id: 'main', x: 0.08, y: 0.08, width: 0.84, height: 0.42, shape: 'polaroid' }],
+    slots: [{ id: 'main', x: 0.08, y: 0.08, width: 0.84, height: 0.42, shape: 'polaroid', adaptiveFit: true }],
     textBlocks: [
       {
         id: 'heading',

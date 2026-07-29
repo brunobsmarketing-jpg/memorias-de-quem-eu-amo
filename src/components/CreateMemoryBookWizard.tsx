@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sparkles, ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react';
 import { PhotoItem, MemoryBookJob, MemoryBookPage, User } from '../types';
 import { BOOK_PAGE_TEMPLATES } from '../data/bookTemplates';
@@ -37,6 +37,12 @@ export const CreateMemoryBookWizard: React.FC<CreateMemoryBookWizardProps> = ({
   onCancel,
 }) => {
   const [currentStep, setCurrentStep] = useState<number>(1);
+
+  // Ao trocar de etapa (principalmente no celular), garante que a pessoa veja
+  // o topo da nova etapa em vez de continuar na posição de rolagem da etapa anterior.
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentStep]);
 
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [fatherName, setFatherName] = useState<string>('');
