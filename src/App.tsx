@@ -9,6 +9,7 @@ import {
   Sparkles,
   Sun,
   Moon,
+  Zap,
 } from 'lucide-react';
 import { User, VideoJob, MemoryBookJob } from './types';
 import {
@@ -27,6 +28,7 @@ import { CreateMemoryBookWizard } from './components/CreateMemoryBookWizard';
 import { DigitalCardPage } from './components/DigitalCardPage';
 import { DigitalBookPage } from './components/DigitalBookPage';
 import { AuthModal } from './components/AuthModal';
+import { BuyCreditsModal } from './components/BuyCreditsModal';
 import { VideoPlayer } from './components/VideoPlayer';
 import { PaywallCheckoutPage } from './components/PaywallCheckoutPage';
 import { fetchVideoJobRemote } from './lib/videoApi';
@@ -43,6 +45,7 @@ export default function App() {
   const [activeVideo, setActiveVideo] = useState<VideoJob | null>(null);
   const [activeBook, setActiveBook] = useState<MemoryBookJob | null>(null);
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
+  const [showBuyCreditsModal, setShowBuyCreditsModal] = useState<boolean>(false);
   const [cardNotFound, setCardNotFound] = useState<boolean>(false);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const stored = localStorage.getItem('memorias_theme');
@@ -318,10 +321,25 @@ export default function App() {
             </button>
             {user && user.isPaidMember ? (
               <>
-                <div className="hidden sm:flex items-center gap-2 bg-slate-900 border border-slate-800 px-3.5 py-1.5 rounded-full text-xs font-bold">
+                <div className="hidden sm:flex items-center gap-2 bg-slate-900 border border-slate-800 pl-3.5 pr-1.5 py-1.5 rounded-full text-xs font-bold">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                   <span className="text-amber-300">{user.credits} Crédito(s)</span>
+                  <button
+                    onClick={() => setShowBuyCreditsModal(true)}
+                    className="p-1 bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 rounded-full transition-colors"
+                    title="Adicionar Créditos"
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                  </button>
                 </div>
+
+                <button
+                  onClick={() => setShowBuyCreditsModal(true)}
+                  className="sm:hidden p-2 bg-slate-900 hover:bg-slate-800 text-amber-400 rounded-xl border border-slate-800 transition-colors"
+                  title="Adicionar Créditos"
+                >
+                  <Zap className="w-4 h-4" />
+                </button>
 
                 <button
                   onClick={handleStartCreation}
@@ -445,12 +463,12 @@ export default function App() {
             {currentView === 'home' && (
               <Dashboard
                 user={user}
-                setUser={setUser as React.Dispatch<React.SetStateAction<User>>}
                 videos={videos}
                 books={books}
                 onStartCreation={handleStartCreation}
                 onSelectVideo={handleSelectVideo}
                 onSelectBook={handleSelectBook}
+                onOpenBuyCredits={() => setShowBuyCreditsModal(true)}
                 onLogout={handleLogout}
               />
             )}
@@ -469,12 +487,27 @@ export default function App() {
         />
       )}
 
+      {/* Buy Credits Modal — acessível pelo cabeçalho, rodapé e de dentro da área de membros */}
+      {showBuyCreditsModal && user && user.isPaidMember && (
+        <BuyCreditsModal user={user} onClose={() => setShowBuyCreditsModal(false)} />
+      )}
+
       {/* Global Footer */}
       <footer className="bg-slate-950 border-t border-slate-900 py-8 px-4 text-center text-xs text-slate-500 space-y-2 mt-12">
         <p className="font-medium text-slate-400">
           Memórias de Quem Eu Amo © 2026 — Plataforma Exclusiva de Homenagens
         </p>
         <p>Acesso exclusivo para membros pagantes com gerador poético por IA, gravação de voz e cartões interativos.</p>
+        {user && user.isPaidMember && (
+          <p>
+            <button
+              onClick={() => setShowBuyCreditsModal(true)}
+              className="text-amber-400 hover:underline font-bold inline-flex items-center gap-1"
+            >
+              <Zap className="w-3.5 h-3.5" /> Adicionar Créditos à Conta
+            </button>
+          </p>
+        )}
         <p className="text-slate-600">
           Trilhas sonoras: "Kevin MacLeod" (incompetech.com) — Licença Creative Commons: By Attribution 4.0 (CC BY 4.0)
         </p>
