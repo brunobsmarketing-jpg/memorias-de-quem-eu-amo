@@ -32,6 +32,7 @@ import { BuyCreditsModal } from './components/BuyCreditsModal';
 import { Toaster, toast } from 'sonner';
 import { VideoPlayer } from './components/VideoPlayer';
 import { PaywallCheckoutPage } from './components/PaywallCheckoutPage';
+import { TrialLandingPage } from './components/TrialLandingPage';
 import { fetchVideoJobRemote } from './lib/videoApi';
 import { fetchMemoryBookRemote } from './lib/bookApi';
 import { loginByEmail } from './lib/authApi';
@@ -48,6 +49,9 @@ export default function App() {
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
   const [showBuyCreditsModal, setShowBuyCreditsModal] = useState<boolean>(false);
   const [cardNotFound, setCardNotFound] = useState<boolean>(false);
+  // Quem cai em /experimente vindo de anúncio não tem contexto nenhum do produto — mostra a
+  // página explicando o que é / como funciona antes de entrar direto no Passo 1 do wizard.
+  const [showTrialIntro, setShowTrialIntro] = useState<boolean>(true);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const stored = localStorage.getItem('memorias_theme');
     return stored === 'dark' ? 'dark' : 'light';
@@ -227,13 +231,15 @@ export default function App() {
       <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
         <Toaster theme={theme} position="top-center" richColors closeButton />
         <main className="flex-1 px-4 sm:px-6 py-8 max-w-7xl mx-auto w-full">
-          <CreateVideoWizard
-            trialMode
-            onFinish={() => {}}
-            onCancel={() => {
-              window.location.href = '/';
-            }}
-          />
+          {showTrialIntro ? (
+            <TrialLandingPage onStart={() => setShowTrialIntro(false)} />
+          ) : (
+            <CreateVideoWizard
+              trialMode
+              onFinish={() => {}}
+              onCancel={() => setShowTrialIntro(true)}
+            />
+          )}
         </main>
       </div>
     );
