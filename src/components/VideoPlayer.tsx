@@ -201,13 +201,26 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaption
       if (lastFrameTimestampRef.current === null) {
         lastFrameTimestampRef.current = timestamp;
       }
-      // Tempo real decorrido desde o último frame (não um incremento fixo assumido) — é isso
-      // que mantém a prévia sincronizada com o áudio, que toca no relógio real do navegador
-      // independente de quantos frames o React consegue desenhar por segundo.
-      const deltaSeconds = (timestamp - lastFrameTimestampRef.current) / 1000;
+      // Tempo real decorrido desde o último frame — nunca usado "cru": quando a aba fica em
+      // segundo plano (troca de aba, minimiza), o requestAnimationFrame fica pausado/muito
+      // atrasado pelo navegador, mas o áudio continua tocando no tempo real dele. Ao voltar pra
+      // aba, o próximo tick chegava com um delta gigante (ex: 30s de aba escondida), fazendo a
+      // prévia pular pra frente de uma vez só (ou pausar cedo demais, achando que acabou) bem
+      // longe de onde o áudio realmente está — daí a sensação de "áudio falhando". Limitar o
+      // delta evita o salto; ver também o uso de currentTime da narração abaixo.
+      const rawDeltaSeconds = (timestamp - lastFrameTimestampRef.current) / 1000;
+      const deltaSeconds = Math.min(rawDeltaSeconds, 0.25);
       lastFrameTimestampRef.current = timestamp;
 
-      const next = timeRef.current + deltaSeconds;
+      // Enquanto a narração está tocando de verdade, ela é a fonte da verdade do tempo — lemos
+      // a posição real do áudio a cada quadro em vez de acumular um relógio à parte. Isso torna
+      // a prévia imune ao problema do delta gigante acima: não importa quanto tempo a aba ficou
+      // em segundo plano, o próximo quadro já nasce exatamente sincronizado com o que está
+      // audível. Quando a narração termina (ou não existe/está mudo), cai de volta pro relógio
+      // por delta, que cobre o silêncio de cauda depois da fala.
+      const narrationEl = narrationAudioRef.current;
+      const narrationDrivesClock = !!narrationEl && !!video.customVoiceAudioUrl && !narrationEl.paused && !narrationEl.ended;
+      const next = narrationDrivesClock ? narrationEl!.currentTime : timeRef.current + deltaSeconds;
 
       if (next >= duration) {
         timeRef.current = duration;
@@ -505,19 +518,24 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaption
             hover persistente e os controles ficavam invisíveis/exigiam toque duplo no mobile.
             Escondidos quando mostra a prévia com marca d'água (vídeo <video> nativo já tem
             controles próprios — os dois juntos ficariam duplicados/confusos). */}
+        {/* Controles flutuam sobre o vídeo/foto (conteúdo de cor arbitrária), não sobre o fundo
+            do site — por isso usam preto/branco fixos (bg-black, text-white) em vez dos tokens
+            slate-900/950 remapeáveis por tema: no tema claro esses tokens viram quase-branco,
+            e um ícone branco em cima de um fundo quase-branco fica invisível (bug real relatado:
+            botões de mudo/tela cheia/reiniciar sumindo no tema claro). */}
         {!(trialMode && trialWatermarkUrl) && (
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent flex flex-col justify-between p-6 z-20">
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-between p-6 z-20">
             <div className="flex justify-end gap-2">
               <button
                 onClick={handleMuteToggle}
-                className="p-3 bg-slate-900/80 hover:bg-slate-800 text-white rounded-full backdrop-blur-md border border-white/10 transition-transform active:scale-95"
+                className="p-3 bg-black/70 hover:bg-black/85 text-white rounded-full backdrop-blur-md border border-white/10 transition-transform active:scale-95"
                 title={isMuted ? 'Ativar som' : 'Mudar para mudo'}
               >
                 {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
               </button>
               <button
                 onClick={handleToggleFullscreen}
-                className="p-3 bg-slate-900/80 hover:bg-slate-800 text-white rounded-full backdrop-blur-md border border-white/10 transition-transform active:scale-95"
+                className="p-3 bg-black/70 hover:bg-black/85 text-white rounded-full backdrop-blur-md border border-white/10 transition-transform active:scale-95"
                 title={isFullscreen ? 'Sair da tela cheia' : 'Ver em tela cheia'}
               >
                 {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
@@ -543,14 +561,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaption
                   </button>
                   <button
                     onClick={handleRestart}
-                    className="p-3 bg-slate-900/80 hover:bg-slate-800 text-white rounded-full backdrop-blur-md border border-white/10"
+                    className="p-3 bg-black/70 hover:bg-black/85 text-white rounded-full backdrop-blur-md border border-white/10"
                     title="Reiniciar"
                   >
                     <RotateCcw className="w-5 h-5" />
                   </button>
                 </div>
 
-                <span className="text-xs font-mono font-medium text-slate-300 bg-slate-950/60 px-2.5 py-1 rounded-md">
+                <span className="text-xs font-mono font-medium text-white/90 bg-black/60 px-2.5 py-1 rounded-md">
                   {Math.floor(currentTime)}s / {Math.floor(duration)}s
                 </span>
               </div>
@@ -615,7 +633,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaption
           <button
             onClick={handleDownloadVideo}
             disabled={isRecordingExport}
-            className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-semibold text-sm rounded-xl border border-slate-700 flex items-center justify-center gap-2 transition-all active:scale-98 shadow-md"
+            className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-100 font-semibold text-sm rounded-xl border border-slate-700 flex items-center justify-center gap-2 transition-all active:scale-98 shadow-md"
           >
             <Download className="w-4 h-4 text-amber-400" />
             {isRecordingExport ? renderStatusLabel || 'Renderizando vídeo em HD...' : 'Baixar Vídeo em HD (.MP4)'}

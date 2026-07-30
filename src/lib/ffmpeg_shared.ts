@@ -121,7 +121,12 @@ export function buildAudioMixFilters({
       `[${musicInputIndex}:a]aloop=loop=-1:size=2000000000,atrim=0:${totalDuration.toFixed(2)},` +
       `volume=${musicWithNarrationVolume},afade=t=out:st=${(totalDuration - 1.5).toFixed(2)}:d=1.5[am]`
     );
-    filters.push(`[an][am]amix=inputs=2:duration=first:dropout_transition=2[aout]`);
+    // normalize=0 é essencial aqui: por padrão o amix RENORMALIZA os volumes ao somar as faixas
+    // (pra evitar clipping), o que na prática anula boa parte da diferença de volume que acabamos
+    // de configurar acima (narração bem mais alta que a trilha) — mesmo com volume=1.0 na
+    // narração e volume=0.18 na trilha, sem "normalize=0" o resultado final saía com a trilha
+    // quase tão alta quanto a narração (bug real relatado: música "abafando" a voz).
+    filters.push(`[an][am]amix=inputs=2:duration=first:dropout_transition=2:normalize=0[aout]`);
     audioLabel = 'aout';
   } else if (narrationInputIndex >= 0) {
     filters.push(`[${narrationInputIndex}:a]volume=${narrationVolume},apad,atrim=0:${totalDuration.toFixed(2)}[aout]`);
