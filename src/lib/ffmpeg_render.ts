@@ -35,7 +35,16 @@ export interface RenderVideoParams {
   narrationAudioDataUrl?: string;
   selectedTrackId?: string;
   captionStyle?: CaptionStyle;
+  aspectRatio?: 'classic' | 'vertical';
 }
+
+// 'classic' (1080x1080) é o formato quadrado histórico do produto; 'vertical' (1080x1920, 9:16)
+// é o novo formato alternativo pensado para Stories/Reels/WhatsApp Status — mesma prévia em
+// canvas usa esses mesmos números (ver CANVAS_DIMENSIONS em VideoPlayer.tsx).
+const OUTPUT_DIMENSIONS: Record<'classic' | 'vertical', { width: number; height: number }> = {
+  classic: { width: 1080, height: 1080 },
+  vertical: { width: 1080, height: 1920 },
+};
 
 // 24fps é suficiente para slides estáticos (sem zoom contínuo) e reduz o trabalho de codificação.
 const FPS = 24;
@@ -199,6 +208,8 @@ export async function renderVideoWithFFmpeg(params: RenderVideoParams): Promise<
       totalDuration = Math.min(MAX_DURATION, Math.max(MIN_DURATION, imageTempPaths.length * 5));
     }
 
+    const { width: outputWidth, height: outputHeight } = OUTPUT_DIMENSIONS[params.aspectRatio === 'vertical' ? 'vertical' : 'classic'];
+
     const n = imageTempPaths.length;
     // Slide estático (sem Ken Burns/crossfade) — cada foto dura o mesmo tempo, sem sobreposição.
     const clipDuration = totalDuration / n;
@@ -232,7 +243,7 @@ export async function renderVideoWithFFmpeg(params: RenderVideoParams): Promise<
       for (let i = 0; i < n; i++) {
         const fadeOutStart = Math.max(0, clipDuration - fadeDuration);
         filters.push(
-          `[${i}:v]scale=1080:1080:force_original_aspect_ratio=increase,crop=1080:1080,fps=${FPS},` +
+          `[${i}:v]scale=${outputWidth}:${outputHeight}:force_original_aspect_ratio=increase,crop=${outputWidth}:${outputHeight},fps=${FPS},` +
           `fade=t=in:st=0:d=${fadeDuration.toFixed(3)},fade=t=out:st=${fadeOutStart.toFixed(3)}:d=${fadeDuration.toFixed(3)},setsar=1[v${i}]`
         );
       }

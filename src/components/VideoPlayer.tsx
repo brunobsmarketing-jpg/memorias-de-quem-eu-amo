@@ -22,8 +22,17 @@ interface VideoPlayerProps {
   onCaptionStyleChange?: (style: CaptionStyle) => void;
 }
 
+// Dimensões de exportação por formato — o quadrado (1080x1080) é o padrão histórico do
+// produto; o vertical (1080x1920, 9:16) é o novo formato alternativo para Stories/Reels.
+// A prévia em canvas e o render final no FFmpeg (ver ffmpeg_render.ts) usam os mesmos números.
+const CANVAS_DIMENSIONS: Record<'classic' | 'vertical', { width: number; height: number }> = {
+  classic: { width: 1080, height: 1080 },
+  vertical: { width: 1080, height: 1920 },
+};
+
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaptionStyle = false, onCaptionStyleChange }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const canvasDims = CANVAS_DIMENSIONS[video.aspectRatio === 'vertical' ? 'vertical' : 'classic'];
   const musicAudioRef = useRef<HTMLAudioElement | null>(null);
   const narrationAudioRef = useRef<HTMLAudioElement | null>(null);
   // Relógio interno da prévia — vive num ref (não num state) porque precisa ser atualizado a
@@ -283,6 +292,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaption
           narrationAudioDataUrl: video.customVoiceAudioUrl,
           selectedTrackId: video.selectedTrackId,
           captionStyle,
+          aspectRatio: video.aspectRatio,
         }),
       });
 
@@ -362,11 +372,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaption
       )}
 
       {/* Main Canvas Frame */}
-      <div className="relative w-full max-w-lg aspect-square bg-slate-900 rounded-2xl overflow-hidden shadow-2xl border border-slate-800 flex items-center justify-center group">
+      <div
+        className={`relative w-full ${video.aspectRatio === 'vertical' ? 'max-w-xs' : 'max-w-lg'} bg-slate-900 rounded-2xl overflow-hidden shadow-2xl border border-slate-800 flex items-center justify-center group`}
+        style={{ aspectRatio: `${canvasDims.width} / ${canvasDims.height}` }}
+      >
         <canvas
           ref={canvasRef}
-          width={1080}
-          height={1080}
+          width={canvasDims.width}
+          height={canvasDims.height}
           className="w-full h-full object-cover"
         />
 

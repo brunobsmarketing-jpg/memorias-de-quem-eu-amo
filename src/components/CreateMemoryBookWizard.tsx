@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Sparkles, ArrowLeft, CheckCircle2, Loader2, X } from 'lucide-react';
-import { PhotoItem, MemoryBookJob, MemoryBookPage, User } from '../types';
+import { PhotoItem, MemoryBookJob, MemoryBookPage, User, AspectRatioOption } from '../types';
 import { BOOK_PAGE_TEMPLATES } from '../data/bookTemplates';
 import { BookStepUploadPhotos, BookStepAssemblePages } from './MemoryBookSteps';
 import { Step2TextTribute, Step3NarrationVoice, Step4MusicTrack } from './WizardSteps';
@@ -46,6 +46,7 @@ interface BookWizardDraft {
   skipNarration: boolean;
   selectedTrackId: string;
   pages: MemoryBookPage[];
+  aspectRatio: AspectRatioOption;
 }
 
 export const CreateMemoryBookWizard: React.FC<CreateMemoryBookWizardProps> = ({
@@ -78,6 +79,7 @@ export const CreateMemoryBookWizard: React.FC<CreateMemoryBookWizardProps> = ({
   const [skipNarration, setSkipNarration] = useState<boolean>(initialDraft?.skipNarration || false);
   const [selectedTrackId, setSelectedTrackId] = useState<string>(initialDraft?.selectedTrackId || PRESET_TRACKS[0].id);
   const [pages, setPages] = useState<MemoryBookPage[]>(() => initialDraft?.pages || createEmptyPages());
+  const [aspectRatio, setAspectRatio] = useState<AspectRatioOption>(initialDraft?.aspectRatio || 'classic');
 
   const [createdBook, setCreatedBook] = useState<MemoryBookJob | null>(null);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
@@ -102,12 +104,13 @@ export const CreateMemoryBookWizard: React.FC<CreateMemoryBookWizardProps> = ({
         skipNarration,
         selectedTrackId,
         pages,
+        aspectRatio,
       });
     }, 800);
     return () => clearTimeout(timer);
   }, [
     currentStep, photos, fatherName, authorName, tributeText, selectedVoiceId,
-    isCustomVoice, customVoiceAudioUrl, skipNarration, selectedTrackId, pages,
+    isCustomVoice, customVoiceAudioUrl, skipNarration, selectedTrackId, pages, aspectRatio,
   ]);
 
   const handleDiscardDraft = () => {
@@ -124,6 +127,7 @@ export const CreateMemoryBookWizard: React.FC<CreateMemoryBookWizardProps> = ({
     setSkipNarration(false);
     setSelectedTrackId(PRESET_TRACKS[0].id);
     setPages(createEmptyPages());
+    setAspectRatio('classic');
   };
 
   const handleGenerateBook = async () => {
@@ -174,6 +178,7 @@ export const CreateMemoryBookWizard: React.FC<CreateMemoryBookWizardProps> = ({
         isCustomVoice,
         customVoiceAudioUrl: skipNarration ? '' : customVoiceAudioUrl,
         narrationText: tributeText || 'Uma homenagem especial de quem te ama.',
+        aspectRatio,
         status: 'unlocked',
         progress: 100,
         cardUrl,
@@ -305,6 +310,10 @@ export const CreateMemoryBookWizard: React.FC<CreateMemoryBookWizardProps> = ({
           <Step4MusicTrack
             selectedTrackId={selectedTrackId}
             setSelectedTrackId={setSelectedTrackId}
+            aspectRatio={aspectRatio}
+            setAspectRatio={setAspectRatio}
+            classicFormatLabel="Retrato (4:5)"
+            classicFormatDescription="Formato padrão — estilo álbum de família"
             onNext={() => setCurrentStep(5)}
             onBack={() => setCurrentStep(3)}
           />

@@ -38,8 +38,13 @@ create table if not exists video_jobs (
   card_url text,
   created_at timestamptz not null default now(),
   duration_seconds integer not null default 30,
-  caption_style jsonb
+  caption_style jsonb,
+  -- 'classic' (formato quadrado/retrato padrão do produto) ou 'vertical' (9:16, novo formato
+  -- alternativo para Stories/Reels) — ver AspectRatioOption em src/types.ts.
+  aspect_ratio text not null default 'classic'
 );
+
+alter table video_jobs add column if not exists aspect_ratio text not null default 'classic';
 
 create table if not exists payments (
   id text primary key,
@@ -89,8 +94,11 @@ create table if not exists memory_book_jobs (
   unlocked_video_url text,
   card_url text,
   created_at timestamptz not null default now(),
-  duration_seconds integer not null default 30
+  duration_seconds integer not null default 30,
+  aspect_ratio text not null default 'classic'
 );
+
+alter table memory_book_jobs add column if not exists aspect_ratio text not null default 'classic';
 
 create index if not exists idx_video_jobs_user_id on video_jobs(user_id);
 create index if not exists idx_media_assets_user_id on media_assets(user_id);

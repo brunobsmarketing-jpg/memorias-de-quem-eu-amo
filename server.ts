@@ -722,7 +722,7 @@ app.post('/api/videos', requireOwnership, async (req: AuthedRequest, res) => {
       return res.status(400).json({ error: 'Número de fotos/imagens excede o limite permitido.' });
     }
 
-    const row = {
+    const row: Record<string, any> = {
       id: job.id,
       user_id: req.authenticatedUserId,
       title: job.title,
@@ -743,15 +743,20 @@ app.post('/api/videos', requireOwnership, async (req: AuthedRequest, res) => {
       created_at: job.createdAt,
       duration_seconds: job.durationSeconds,
       caption_style: job.captionStyle || null,
+      aspect_ratio: job.aspectRatio || 'classic',
     };
 
-    let { error } = await supabaseAdmin.from('video_jobs').upsert(row, { onConflict: 'id' });
-    if (error && /caption_style/.test(error.message || '')) {
-      // Coluna ainda não existe no banco (rodar supabase_schema.sql atualizado) — salva sem
-      // o estilo de legenda em vez de quebrar o salvamento do vídeo inteiro.
-      console.warn('Coluna caption_style ausente no Supabase — salvando vídeo sem o estilo de legenda.');
-      const { caption_style, ...rowWithoutCaptionStyle } = row;
-      ({ error } = await supabaseAdmin.from('video_jobs').upsert(rowWithoutCaptionStyle, { onConflict: 'id' }));
+    // Colunas adicionadas depois da criação da tabela (rodar supabase_schema.sql atualizado)
+    // podem ainda não existir em bancos mais antigos — em vez de quebrar o salvamento do vídeo
+    // inteiro, tenta de novo sem cada coluna ausente, até um upsert sem erro de coluna.
+    let error: any = null;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      ({ error } = await supabaseAdmin.from('video_jobs').upsert(row, { onConflict: 'id' }));
+      const missingColumnMatch = /column "([^"]+)"/.exec(error?.message || '');
+      const missingColumn = missingColumnMatch?.[1];
+      if (!error || !missingColumn || !(missingColumn in row)) break;
+      console.warn(`Coluna ${missingColumn} ausente no Supabase — salvando vídeo sem esse campo.`);
+      delete row[missingColumn];
     }
     if (error) throw error;
 
@@ -798,6 +803,7 @@ app.get('/api/videos/:id', async (req, res) => {
         createdAt: data.created_at,
         durationSeconds: data.duration_seconds,
         captionStyle: data.caption_style || undefined,
+        aspectRatio: data.aspect_ratio || 'classic',
       },
     });
   } catch (error: any) {
@@ -819,7 +825,7 @@ app.post('/api/memory-books', requireOwnership, async (req: AuthedRequest, res) 
       return res.status(400).json({ error: 'Número de fotos/páginas excede o limite permitido.' });
     }
 
-    const row = {
+    const row: Record<string, any> = {
       id: book.id,
       user_id: req.authenticatedUserId,
       father_name: book.fatherName,
@@ -836,9 +842,20 @@ app.post('/api/memory-books', requireOwnership, async (req: AuthedRequest, res) 
       card_url: book.cardUrl,
       created_at: book.createdAt,
       duration_seconds: book.durationSeconds,
+      aspect_ratio: book.aspectRatio || 'classic',
     };
 
-    const { error } = await supabaseAdmin.from('memory_book_jobs').upsert(row, { onConflict: 'id' });
+    // Mesma proteção usada em /api/videos: se aspect_ratio ainda não existir no banco (rodar
+    // supabase_schema.sql atualizado), tenta de novo sem essa coluna em vez de falhar o save.
+    let error: any = null;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      ({ error } = await supabaseAdmin.from('memory_book_jobs').upsert(row, { onConflict: 'id' }));
+      const missingColumnMatch = /column "([^"]+)"/.exec(error?.message || '');
+      const missingColumn = missingColumnMatch?.[1];
+      if (!error || !missingColumn || !(missingColumn in row)) break;
+      console.warn(`Coluna ${missingColumn} ausente no Supabase — salvando livro sem esse campo.`);
+      delete row[missingColumn];
+    }
     if (error) throw error;
 
     res.json({ success: true });
@@ -880,6 +897,7 @@ app.get('/api/memory-books/:id', async (req, res) => {
         cardUrl: data.card_url,
         createdAt: data.created_at,
         durationSeconds: data.duration_seconds,
+        aspectRatio: data.aspect_ratio || 'classic',
       },
     });
   } catch (error: any) {
@@ -1268,7 +1286,7 @@ app.post('/api/clone-voice', expensiveAiLimiter, async (req, res) => {
 // minutos quando há fila (ver RenderQueue acima), o que arriscaria timeout no proxy em
 // picos de tráfego.
 app.post('/api/render-video', renderLimiter, async (req, res) => {
-  const { videoId, fatherName, photos, aiImages, useAIImages, tributeText, narrationAudioDataUrl, selectedTrackId, captionStyle } = req.body;
+  const { videoId, fatherName, photos, aiImages, useAIImages, tributeText, narrationAudioDataUrl, selectedTrackId, captionStyle, aspectRatio } = req.body;
 
   // No modo "só IA" o vídeo não tem nenhuma foto real — o conteúdo visual inteiro vem de
   // aiImages. Validar só "photos" rejeitava esses vídeos com 400 antes mesmo de chegar no
@@ -1303,6 +1321,7 @@ app.post('/api/render-video', renderLimiter, async (req, res) => {
         narrationAudioDataUrl,
         selectedTrackId,
         captionStyle,
+        aspectRatio,
       });
     });
 
@@ -1330,7 +1349,7 @@ app.post('/api/render-video', renderLimiter, async (req, res) => {
 // Mesmo padrão assíncrono de fila + polling de /api/render-video, mas para o Livro de Memórias:
 // cada página já chega pronta (PNG composto no navegador) e vira um slide com zoom/transição.
 app.post('/api/render-book-video', renderLimiter, async (req, res) => {
-  const { bookId, pageImageUrls, narrationAudioDataUrl, selectedTrackId } = req.body;
+  const { bookId, pageImageUrls, narrationAudioDataUrl, selectedTrackId, aspectRatio } = req.body;
 
   if (!pageImageUrls || pageImageUrls.length === 0) {
     return res.status(400).json({ error: 'É necessário ao menos uma página para renderizar o vídeo do livro.' });
@@ -1356,6 +1375,7 @@ app.post('/api/render-book-video', renderLimiter, async (req, res) => {
         pageImageUrls,
         narrationAudioDataUrl,
         selectedTrackId,
+        aspectRatio,
       });
     });
 

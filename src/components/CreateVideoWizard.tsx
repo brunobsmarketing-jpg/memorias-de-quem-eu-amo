@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Sparkles, ArrowLeft, CheckCircle2, Loader2, X } from 'lucide-react';
-import { PhotoItem, VideoJob, User, CaptionStyle } from '../types';
+import { PhotoItem, VideoJob, User, CaptionStyle, AspectRatioOption } from '../types';
 import {
   Step1UploadPhotos,
   Step2TextTribute,
@@ -42,6 +42,7 @@ interface VideoWizardDraft {
   selectedImageStyle: string;
   memoryAge: string;
   narratorGender: string;
+  aspectRatio: AspectRatioOption;
 }
 
 export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
@@ -80,6 +81,7 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
   const [selectedImageStyle, setSelectedImageStyle] = useState<string>(initialDraft?.selectedImageStyle || 'watercolor');
   const [memoryAge, setMemoryAge] = useState<string>(initialDraft?.memoryAge || 'auto');
   const [narratorGender, setNarratorGender] = useState<string>(initialDraft?.narratorGender || 'auto');
+  const [aspectRatio, setAspectRatio] = useState<AspectRatioOption>(initialDraft?.aspectRatio || 'classic');
 
   // Salva o rascunho (com debounce) a cada mudança relevante, enquanto ainda não chegou na
   // prévia final — depois do Passo 6 o job já existe de verdade, não faz mais sentido "rascunhar".
@@ -103,13 +105,14 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
         selectedImageStyle,
         memoryAge,
         narratorGender,
+        aspectRatio,
       });
     }, 800);
     return () => clearTimeout(timer);
   }, [
     currentStep, photos, aiOnlyMode, fatherName, authorName, tributeText, selectedVoiceId,
     isCustomVoice, customVoiceAudioUrl, skipNarration, selectedTrackId, useAIImages, aiImages,
-    selectedImageStyle, memoryAge, narratorGender,
+    selectedImageStyle, memoryAge, narratorGender, aspectRatio,
   ]);
 
   const handleDiscardDraft = () => {
@@ -131,6 +134,7 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
     setSelectedImageStyle('watercolor');
     setMemoryAge('auto');
     setNarratorGender('auto');
+    setAspectRatio('classic');
   };
 
   // Created Draft Job
@@ -184,6 +188,7 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
       selectedTrackId,
       useAIImages,
       aiGeneratedImages: aiImages,
+      aspectRatio,
       status: 'unlocked',
       progress: 100,
       cardUrl,
@@ -326,6 +331,10 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
           <Step4MusicTrack
             selectedTrackId={selectedTrackId}
             setSelectedTrackId={setSelectedTrackId}
+            aspectRatio={aspectRatio}
+            setAspectRatio={setAspectRatio}
+            classicFormatLabel="Quadrado (1:1)"
+            classicFormatDescription="Formato padrão — ideal para feed e WhatsApp"
             onNext={() => setCurrentStep(5)}
             onBack={() => setCurrentStep(3)}
           />

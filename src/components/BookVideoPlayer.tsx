@@ -32,6 +32,11 @@ export const BookVideoPlayer: React.FC<BookVideoPlayerProps> = ({ book }) => {
   const pages = book.pages.filter((p) => !!p.renderedImageUrl);
   const pageDurationMs = Math.max(1500, (book.durationSeconds / Math.max(1, pages.length)) * 1000);
   const selectedTrack = PRESET_TRACKS.find((t) => t.id === book.selectedTrackId) || PRESET_TRACKS[0];
+  // As páginas em si continuam sempre no formato 4:5 (ver bookTemplates.ts) — no formato
+  // vertical, o vídeo final tarja essa página num quadro 9:16 (ver ffmpeg_book_render.ts).
+  // A prévia aqui reflete isso pra não prometer um enquadramento diferente do resultado real.
+  const isVertical = book.aspectRatio === 'vertical';
+  const previewAspectRatio = isVertical ? '1080 / 1920' : '1080 / 1350';
 
   useEffect(() => {
     if (!isPlaying || pages.length === 0) return;
@@ -79,6 +84,7 @@ export const BookVideoPlayer: React.FC<BookVideoPlayerProps> = ({ book }) => {
           pageImageUrls: pages.map((p) => p.renderedImageUrl),
           narrationAudioDataUrl: book.customVoiceAudioUrl,
           selectedTrackId: book.selectedTrackId,
+          aspectRatio: book.aspectRatio,
         }),
       });
 
@@ -140,8 +146,8 @@ export const BookVideoPlayer: React.FC<BookVideoPlayerProps> = ({ book }) => {
         <video
           src={videoUrl}
           controls
-          className="w-full max-w-lg rounded-2xl shadow-2xl border border-slate-800"
-          style={{ aspectRatio: '1080 / 1350' }}
+          className={`w-full ${isVertical ? 'max-w-xs' : 'max-w-lg'} rounded-2xl shadow-2xl border border-slate-800`}
+          style={{ aspectRatio: previewAspectRatio }}
         />
         <button
           onClick={handleDownloadVideo}
@@ -159,15 +165,15 @@ export const BookVideoPlayer: React.FC<BookVideoPlayerProps> = ({ book }) => {
       {book.customVoiceAudioUrl && <audio ref={narrationRef} src={book.customVoiceAudioUrl} crossOrigin="anonymous" />}
 
       <div
-        className="relative w-full max-w-lg bg-slate-900 rounded-2xl overflow-hidden shadow-2xl border border-slate-800"
-        style={{ aspectRatio: '1080 / 1350' }}
+        className={`relative w-full ${isVertical ? 'max-w-xs' : 'max-w-lg'} bg-slate-900 rounded-2xl overflow-hidden shadow-2xl border border-slate-800`}
+        style={{ aspectRatio: previewAspectRatio }}
       >
         {pages.map((page, i) => (
           <img
             key={page.id}
             src={page.renderedImageUrl}
             alt=""
-            className="absolute inset-0 w-full h-full object-cover"
+            className={`absolute inset-0 w-full h-full ${isVertical ? 'object-contain bg-black' : 'object-cover'}`}
             style={{
               opacity: i === activeIndex ? 1 : 0,
               transform: i === activeIndex && isPlaying ? 'scale(1.06)' : 'scale(1)',

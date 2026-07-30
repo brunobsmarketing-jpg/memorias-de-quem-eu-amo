@@ -26,7 +26,14 @@ export interface RenderMemoryBookParams {
   pageImageUrls: string[]; // PNG (data URL ou URL do Storage) de cada página, já na ordem final
   narrationAudioDataUrl?: string;
   selectedTrackId?: string;
+  aspectRatio?: 'classic' | 'vertical';
 }
+
+// No formato vertical, a página em si continua desenhada no seu tamanho normal 4:5 (os
+// templates em bookTemplates.ts têm coordenadas fracionárias pensadas pra essa proporção —
+// esticar pra 9:16 distorceria fotos/textos) — em vez disso, ela é centralizada com barras
+// pretas (letterbox) dentro de um quadro 9:16, como uma "página flutuando" num vídeo vertical.
+const VERTICAL_OUTPUT_HEIGHT = 1920;
 
 const FPS = 24;
 const MIN_DURATION = 15;
@@ -151,11 +158,18 @@ export async function renderMemoryBookWithFFmpeg(params: RenderMemoryBookParams)
       const filters: string[] = [];
       const framesPerPage = Math.max(1, Math.round(pageDuration * FPS));
 
+      // No formato vertical, a página (sempre composta em 4:5) fica centralizada com barras
+      // pretas até completar um quadro 9:16 — ver comentário de VERTICAL_OUTPUT_HEIGHT acima.
+      const isVertical = params.aspectRatio === 'vertical';
+      const padFilter = isVertical
+        ? `,pad=${BOOK_PAGE_WIDTH}:${VERTICAL_OUTPUT_HEIGHT}:0:${Math.round((VERTICAL_OUTPUT_HEIGHT - BOOK_PAGE_HEIGHT) / 2)}:color=black`
+        : '';
+
       // --- Vídeo: cada página com um leve zoom contínuo (Ken Burns) ---
       for (let i = 0; i < n; i++) {
         filters.push(
           `[${i}:v]scale=${BOOK_PAGE_WIDTH}:${BOOK_PAGE_HEIGHT},` +
-          `zoompan=z='min(zoom+0.0008,${MAX_ZOOM})':d=${framesPerPage}:s=${BOOK_PAGE_WIDTH}x${BOOK_PAGE_HEIGHT}:fps=${FPS},setsar=1[vz${i}]`
+          `zoompan=z='min(zoom+0.0008,${MAX_ZOOM})':d=${framesPerPage}:s=${BOOK_PAGE_WIDTH}x${BOOK_PAGE_HEIGHT}:fps=${FPS}${padFilter},setsar=1[vz${i}]`
         );
       }
 

@@ -84,6 +84,10 @@ export interface AITextPromptData {
   tone: 'emocionante' | 'grato' | 'saudosista' | 'divertido';
 }
 
+// 'classic' = formato padrão atual do produto (1080x1080 no vídeo, 1080x1350/4:5 no livro);
+// 'vertical' = novo formato alternativo 9:16 (1080x1920), pensado para Stories/Reels/TikTok.
+export type AspectRatioOption = 'classic' | 'vertical';
+
 export interface VideoJob {
   id: string;
   userId: string;
@@ -98,6 +102,7 @@ export interface VideoJob {
   useAIImages: boolean;
   aiGeneratedImages: { prompt: string; url: string }[];
   captionStyle?: CaptionStyle;
+  aspectRatio?: AspectRatioOption;
   status: 'draft' | 'processing' | 'watermarked' | 'unlocked';
   progress: number;
   watermarkVideoUrl?: string;
@@ -180,6 +185,7 @@ export interface MemoryBookJob {
   isCustomVoice: boolean;
   customVoiceAudioUrl?: string;
   narrationText: string;
+  aspectRatio?: AspectRatioOption;
   status: 'draft' | 'processing' | 'unlocked';
   progress: number;
   unlockedVideoUrl?: string;

@@ -17,8 +17,9 @@ import {
   Heart,
   Volume2,
   MousePointerClick,
+  Smartphone,
 } from 'lucide-react';
-import { PhotoItem, AITextPromptData, PresetVoice, PresetTrack } from '../types';
+import { PhotoItem, AITextPromptData, PresetVoice, PresetTrack, AspectRatioOption } from '../types';
 import { PRESET_VOICES, PRESET_TRACKS, AI_IMAGE_STYLES } from '../data/presets';
 import { generateAITributeText } from '../lib/textgen';
 import { extractVisualThemesFromText, generateAIIllustrationImage, VisualTheme } from '../lib/imagegen';
@@ -822,6 +823,13 @@ const SquareIcon: React.FC<{ className?: string }> = ({ className }) => (
 interface Step4MusicProps {
   selectedTrackId: string;
   setSelectedTrackId: (id: string) => void;
+  aspectRatio: AspectRatioOption;
+  setAspectRatio: (ratio: AspectRatioOption) => void;
+  // Rótulo/descrição do formato "classic" nesse produto — o vídeo clássico é quadrado (1:1),
+  // já o Livro de Memórias é retrato (4:5), então cada wizard passa o texto certo pro mesmo
+  // seletor genérico em vez de duplicar esse bloco de UI em dois lugares.
+  classicFormatLabel: string;
+  classicFormatDescription: string;
   onNext: () => void;
   onBack: () => void;
 }
@@ -829,6 +837,10 @@ interface Step4MusicProps {
 export const Step4MusicTrack: React.FC<Step4MusicProps> = ({
   selectedTrackId,
   setSelectedTrackId,
+  aspectRatio,
+  setAspectRatio,
+  classicFormatLabel,
+  classicFormatDescription,
   onNext,
   onBack,
 }) => {
@@ -896,6 +908,43 @@ export const Step4MusicTrack: React.FC<Step4MusicProps> = ({
             {selectedTrackId === track.id && <CheckCircle2 className="w-5 h-5 text-amber-400" />}
           </div>
         ))}
+      </div>
+
+      <div className="space-y-2 pt-2">
+        <p className="text-[11px] text-slate-500 font-semibold uppercase tracking-wider">Formato do Vídeo</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div
+            onClick={() => setAspectRatio('classic')}
+            className={`p-4 rounded-2xl border cursor-pointer flex items-center gap-3 transition-all ${
+              aspectRatio === 'classic'
+                ? 'bg-amber-500/20 border-amber-500 shadow-lg'
+                : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+            }`}
+          >
+            <SquareIcon className="w-8 h-5 text-amber-400 flex-shrink-0" />
+            <div className="flex-1">
+              <h5 className="font-bold text-sm text-slate-100">{classicFormatLabel}</h5>
+              <p className="text-xs text-slate-400">{classicFormatDescription}</p>
+            </div>
+            {aspectRatio === 'classic' && <CheckCircle2 className="w-5 h-5 text-amber-400 flex-shrink-0" />}
+          </div>
+
+          <div
+            onClick={() => setAspectRatio('vertical')}
+            className={`p-4 rounded-2xl border cursor-pointer flex items-center gap-3 transition-all ${
+              aspectRatio === 'vertical'
+                ? 'bg-amber-500/20 border-amber-500 shadow-lg'
+                : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+            }`}
+          >
+            <Smartphone className="w-5 h-8 text-amber-400 flex-shrink-0" />
+            <div className="flex-1">
+              <h5 className="font-bold text-sm text-slate-100">Vertical (9:16)</h5>
+              <p className="text-xs text-slate-400">Ideal para Stories, Reels e WhatsApp Status</p>
+            </div>
+            {aspectRatio === 'vertical' && <CheckCircle2 className="w-5 h-5 text-amber-400 flex-shrink-0" />}
+          </div>
+        </div>
       </div>
 
       <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 pt-4">
