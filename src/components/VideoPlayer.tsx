@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Play, Pause, RotateCcw, Volume2, VolumeX, Download, CheckCircle2 } from 'lucide-react';
+import { Play, Pause, RotateCcw, Volume2, VolumeX, Download, Maximize, Minimize } from 'lucide-react';
 import { VideoJob, CaptionStyle } from '../types';
 import { drawVideoFrame, getAllSlides } from '../lib/video';
 import { PRESET_TRACKS, CAPTION_FONTS, CAPTION_COLORS, CAPTION_BACKGROUNDS } from '../data/presets';
@@ -33,6 +33,8 @@ const CANVAS_DIMENSIONS: Record<'classic' | 'vertical', { width: number; height:
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaptionStyle = false, onCaptionStyleChange }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasDims = CANVAS_DIMENSIONS[video.aspectRatio === 'vertical' ? 'vertical' : 'classic'];
+  const playerFrameRef = useRef<HTMLDivElement | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const musicAudioRef = useRef<HTMLAudioElement | null>(null);
   const narrationAudioRef = useRef<HTMLAudioElement | null>(null);
   // Relógio interno da prévia — vive num ref (não num state) porque precisa ser atualizado a
@@ -271,6 +273,24 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaption
     if (narrationAudioRef.current) narrationAudioRef.current.muted = !isMuted;
   };
 
+  // Sincroniza o estado com a tela cheia real do navegador — cobre tanto o botão quanto o
+  // usuário saindo pelo Esc ou pelo gesto nativo do celular, que não passam pelo nosso onClick.
+  useEffect(() => {
+    const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const handleToggleFullscreen = () => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else {
+      playerFrameRef.current?.requestFullscreen().catch(() => {
+        toast.error('Não foi possível abrir em tela cheia neste navegador.');
+      });
+    }
+  };
+
   // Envia o vídeo para a fila de renderização no servidor (FFmpeg) e acompanha o progresso
   // via polling, em vez de manter a requisição HTTP aberta — em horários de pico o vídeo
   // pode ficar alguns instantes na fila antes de começar a renderizar de fato (ver
@@ -373,33 +393,34 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaption
 
       {/* Main Canvas Frame */}
       <div
-        className={`relative w-full ${video.aspectRatio === 'vertical' ? 'max-w-xs' : 'max-w-lg'} bg-slate-900 rounded-2xl overflow-hidden shadow-2xl border border-slate-800 flex items-center justify-center group`}
-        style={{ aspectRatio: `${canvasDims.width} / ${canvasDims.height}` }}
+        ref={playerFrameRef}
+        className={`relative w-full ${video.aspectRatio === 'vertical' ? 'max-w-xs' : 'max-w-lg'} ${isFullscreen ? 'max-w-none h-full' : ''} bg-slate-900 rounded-2xl overflow-hidden shadow-2xl border border-slate-800 flex items-center justify-center group`}
+        style={{ aspectRatio: isFullscreen ? undefined : `${canvasDims.width} / ${canvasDims.height}` }}
       >
         <canvas
           ref={canvasRef}
           width={canvasDims.width}
           height={canvasDims.height}
-          className="w-full h-full object-cover"
+          className={isFullscreen ? 'max-w-full max-h-full w-auto h-auto object-contain' : 'w-full h-full object-cover'}
         />
-
-        {/* Status Badge */}
-        <div className="absolute top-4 left-4 z-10 flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold backdrop-blur-md bg-slate-900/70 border border-white/10 text-white shadow-lg">
-          <span className="flex items-center gap-1.5 text-emerald-400">
-            <CheckCircle2 className="w-4 h-4" /> HD Sem Marca d'Água
-          </span>
-        </div>
 
         {/* Video Overlays Controls — sempre visíveis (não só no hover), já que celular não tem
             hover persistente e os controles ficavam invisíveis/exigiam toque duplo no mobile */}
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent flex flex-col justify-between p-6 z-20">
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
             <button
               onClick={handleMuteToggle}
               className="p-3 bg-slate-900/80 hover:bg-slate-800 text-white rounded-full backdrop-blur-md border border-white/10 transition-transform active:scale-95"
               title={isMuted ? 'Ativar som' : 'Mudar para mudo'}
             >
               {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+            </button>
+            <button
+              onClick={handleToggleFullscreen}
+              className="p-3 bg-slate-900/80 hover:bg-slate-800 text-white rounded-full backdrop-blur-md border border-white/10 transition-transform active:scale-95"
+              title={isFullscreen ? 'Sair da tela cheia' : 'Ver em tela cheia'}
+            >
+              {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
             </button>
           </div>
 

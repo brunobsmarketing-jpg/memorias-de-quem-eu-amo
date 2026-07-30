@@ -20,7 +20,7 @@ import {
   Smartphone,
 } from 'lucide-react';
 import { PhotoItem, AITextPromptData, PresetVoice, PresetTrack, AspectRatioOption } from '../types';
-import { PRESET_VOICES, PRESET_TRACKS, AI_IMAGE_STYLES } from '../data/presets';
+import { PRESET_VOICES, PRESET_TRACKS, AI_IMAGE_STYLES, MAX_TRIBUTE_TEXT_CHARS } from '../data/presets';
 import { generateAITributeText } from '../lib/textgen';
 import { extractVisualThemesFromText, generateAIIllustrationImage, VisualTheme } from '../lib/imagegen';
 import { VoiceRecorder, synthesizeTTSNarration, cloneVoiceAndSynthesize } from '../lib/voice';
@@ -446,12 +446,19 @@ export const Step2TextTribute: React.FC<Step2TextProps> = ({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <label className="text-xs font-semibold text-slate-300">Texto da Narração Final (pode editar à vontade)</label>
-          <span className="text-xs font-mono text-slate-500">{tributeText.length} / 400 caracteres</span>
+          <span
+            className={`text-xs font-mono ${
+              tributeText.length >= MAX_TRIBUTE_TEXT_CHARS ? 'text-rose-400' : 'text-slate-500'
+            }`}
+          >
+            {tributeText.length} / {MAX_TRIBUTE_TEXT_CHARS} caracteres
+          </span>
         </div>
         <textarea
           rows={5}
           value={tributeText}
           onChange={(e) => setTributeText(e.target.value)}
+          maxLength={MAX_TRIBUTE_TEXT_CHARS}
           placeholder="Ex: Pai, em cada passo do meu caminho, vejo as marcas do seu amor e da sua dedicação. Obrigado por ser meu exemplo diário..."
           className="w-full p-4 bg-slate-900 border border-slate-700 rounded-2xl text-slate-100 text-sm focus:outline-none focus:border-amber-500 leading-relaxed shadow-inner"
         />

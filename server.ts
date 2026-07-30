@@ -20,6 +20,7 @@ import { WebhookSignatureValidator, InvalidWebhookSignatureError } from 'mercado
 import { isPaytWebhookConfigured, getPaytWebhookSecret } from './src/lib/payt';
 import { getPaytProductById } from './src/lib/paytCatalog';
 import { sendAccessGrantedEmail } from './src/lib/email';
+import { MAX_TRIBUTE_TEXT_CHARS } from './src/data/presets';
 
 // Falha rápido com uma mensagem clara se faltar uma env var essencial ao funcionamento básico
 // do app — evita crash-loops confusos como o que já aconteceu (ver src/lib/envCheck.ts).
@@ -1154,6 +1155,9 @@ app.post('/api/generate-narration-tts', aiGenerationLimiter, async (req, res) =>
     if (!text) {
       return res.status(400).json({ error: 'Texto para narração é necessário' });
     }
+    if (text.length > MAX_TRIBUTE_TEXT_CHARS) {
+      return res.status(400).json({ error: `Texto muito longo (máximo de ${MAX_TRIBUTE_TEXT_CHARS} caracteres).` });
+    }
     if (!ELEVENLABS_API_KEY) {
       return res.status(500).json({ error: 'ELEVENLABS_API_KEY não configurada no servidor' });
     }
@@ -1203,6 +1207,9 @@ app.post('/api/clone-voice', expensiveAiLimiter, async (req, res) => {
     const { audioDataUrl, tributeText, voiceName } = req.body;
     if (!audioDataUrl || !tributeText) {
       return res.status(400).json({ error: 'audioDataUrl e tributeText são obrigatórios' });
+    }
+    if (tributeText.length > MAX_TRIBUTE_TEXT_CHARS) {
+      return res.status(400).json({ error: `Texto muito longo (máximo de ${MAX_TRIBUTE_TEXT_CHARS} caracteres).` });
     }
     if (!ELEVENLABS_API_KEY) {
       return res.status(500).json({ error: 'ELEVENLABS_API_KEY não configurada no servidor' });

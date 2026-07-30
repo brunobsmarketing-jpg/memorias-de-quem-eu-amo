@@ -1,5 +1,20 @@
 import { PresetVoice, PresetTrack, CreditPackage, AIImageStyle, CaptionFontOption, CaptionColorOption, CaptionBackgroundOption } from '../types';
 
+// Limite de caracteres do texto de homenagem (narração). Calculado a partir de dois limites
+// técnicos, não escolhido no chute:
+// 1) Custo: a narração é sintetizada pela ElevenLabs (eleven_multilingual_v2), cobrada por
+//    caractere (~R$0,50 a R$1,10 por 1.000 caracteres, dependendo do plano) — cada caractere
+//    digitado tem custo real de IA.
+// 2) Desperdício: o vídeo final tem um teto de duração (75s no slideshow, 90s no livro — ver
+//    MAX_DURATION em ffmpeg_render.ts/ffmpeg_book_render.ts). Numa fala natural (~15 caracteres
+//    por segundo), um texto acima de ~1.100 caracteres já gera narração mais longa que esse teto
+//    — o áudio extra é cortado no render final, ou seja, a ElevenLabs é cobrada por segundos de
+//    fala que nunca aparecem no vídeo.
+// 900 caracteres ≈ 60s de narração (150-170 palavras) — abaixo do teto de 75s com folga de
+// segurança (fala mais lenta que o normal ainda cabe), suficiente pra uma homenagem completa, e
+// mantém o custo de TTS por vídeo em ~R$0,45-R$1,00 (uma fração pequena da receita por crédito).
+export const MAX_TRIBUTE_TEXT_CHARS = 900;
+
 // Tipografias disponíveis para a legenda queimada no vídeo final. "ttfFileName" aponta pra um
 // arquivo em assets/fonts/ (usado pelo FFmpeg via drawtext); "previewFontFamily" é a mesma fonte
 // carregada via Google Fonts (ver index.html) pra prévia em canvas bater com o vídeo final.
