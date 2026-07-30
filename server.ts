@@ -210,7 +210,11 @@ app.post('/api/upload-media', accountLimiter, async (req, res) => {
 
     const { error: uploadError } = await supabaseAdmin.storage
       .from(MEDIA_BUCKET)
-      .upload(filePath, buffer, { contentType: mimeType, upsert: true });
+      // cacheControl longo (1 ano) porque o nome do arquivo já é único por upload (timestamp +
+      // aleatório) — nunca é sobrescrito com conteúdo diferente no mesmo caminho, então cachear
+      // agressivamente é seguro e corta bastante o consumo de egress de quem revisita o mesmo
+      // cartão/vídeo várias vezes (o padrão do Supabase sem isso é só 1h).
+      .upload(filePath, buffer, { contentType: mimeType, upsert: true, cacheControl: '31536000' });
 
     if (uploadError) throw uploadError;
 
@@ -1398,7 +1402,7 @@ Mood: celebratory, warm, loving, elegant.`;
 
     const { error: uploadError } = await supabaseAdmin.storage
       .from(MEDIA_BUCKET)
-      .upload(CARD_BACKGROUND_STORAGE_PATH, buffer, { contentType: 'image/png', upsert: true });
+      .upload(CARD_BACKGROUND_STORAGE_PATH, buffer, { contentType: 'image/png', upsert: true, cacheControl: '31536000' });
     if (uploadError) throw uploadError;
 
     res.json({ imageUrl: publicUrlData.publicUrl, cached: false });
@@ -1582,7 +1586,10 @@ async function renderAndPublishVideo(params: RenderAndPublishParams): Promise<st
   const storagePath = `videos/${params.videoId}/${params.watermark ? 'watermark' : 'render'}.mp4`;
   const { error: uploadError } = await supabaseAdmin.storage
     .from(MEDIA_BUCKET)
-    .upload(storagePath, fileBuffer, { contentType: 'video/mp4', upsert: true });
+    // Provavelmente o maior fator de cached egress do projeto (vídeo é o arquivo mais pesado que
+    // servimos) — cache de 1 ano é seguro porque o caminho é fixo por vídeo e nunca é
+    // re-renderizado depois de pronto.
+    .upload(storagePath, fileBuffer, { contentType: 'video/mp4', upsert: true, cacheControl: '31536000' });
   if (uploadError) throw uploadError;
 
   const { data: publicUrlData } = supabaseAdmin.storage.from(MEDIA_BUCKET).getPublicUrl(storagePath);
@@ -1695,7 +1702,7 @@ app.post('/api/render-book-video', renderLimiter, async (req, res) => {
     const storagePath = `books/${finalBookId}/render.mp4`;
     const { error: uploadError } = await supabaseAdmin.storage
       .from(MEDIA_BUCKET)
-      .upload(storagePath, fileBuffer, { contentType: 'video/mp4', upsert: true });
+      .upload(storagePath, fileBuffer, { contentType: 'video/mp4', upsert: true, cacheControl: '31536000' });
     if (uploadError) throw uploadError;
 
     const { data: publicUrlData } = supabaseAdmin.storage.from(MEDIA_BUCKET).getPublicUrl(storagePath);
