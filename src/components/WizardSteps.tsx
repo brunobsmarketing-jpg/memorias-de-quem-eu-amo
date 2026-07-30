@@ -1049,19 +1049,30 @@ export const Step5AIImagesOption: React.FC<Step5AIImagesProps> = ({
       const themes = await extractVisualThemesFromText(tributeText, fatherName, imageCount, memoryAge, narratorGender);
       setGeneratingProgress(1); // temas extraídos
 
-      // Uma de cada vez, não Promise.all — a OpenAI limita o gpt-image-1 a poucas imagens por
-      // minuto na conta inteira, e disparar todas de uma vez estourava esse limite quase sempre
-      // (visto direto nos logs de produção), fazendo várias cenas caírem no desenho de fallback
-      // local em vez da ilustração de IA de verdade. Gerando em sequência, cada chamada já leva
-      // vários segundos sozinha, o que naturalmente espaça os pedidos dentro do limite.
-      const generatedList: { prompt: string; url: string }[] = [];
+      // Gera no máximo 2 de cada vez, não todas de uma vez (Promise.all puro) nem uma por uma —
+      // a OpenAI limita o gpt-image-1 a poucas imagens por minuto na conta inteira, e disparar
+      // tudo de uma vez estourava esse limite quase sempre (visto direto nos logs de produção),
+      // fazendo várias cenas caírem no desenho de fallback local em vez da ilustração de IA de
+      // verdade. 2 por vez é um meio-termo: ainda bem mais lento que estourar o limite, mas
+      // sensivelmente mais rápido que uma por uma pro caso comum de 2-5 ilustrações.
+      const CONCURRENCY = 2;
+      const generatedList: { prompt: string; url: string }[] = new Array(themes.length);
       let fallbackCount = 0;
-      for (const t of themes) {
-        const result = await generateAIIllustrationImage(t.titlePt, t.promptEn, selectedImageStyle);
-        if (result.isFallback) fallbackCount++;
-        generatedList.push({ prompt: t.titlePt, url: result.url });
-        setGeneratingProgress((prev) => prev + 1);
-      }
+      let completedCount = 0;
+      let nextIndex = 0;
+
+      const worker = async () => {
+        while (nextIndex < themes.length) {
+          const i = nextIndex++;
+          const t = themes[i];
+          const result = await generateAIIllustrationImage(t.titlePt, t.promptEn, selectedImageStyle);
+          if (result.isFallback) fallbackCount++;
+          generatedList[i] = { prompt: t.titlePt, url: result.url };
+          completedCount++;
+          setGeneratingProgress(completedCount + 1);
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, themes.length) }, worker));
       setAiImages(generatedList);
 
       if (fallbackCount > 0) {
@@ -1236,21 +1247,22 @@ export const Step5AIImagesOption: React.FC<Step5AIImagesProps> = ({
             <p className="text-sm font-medium text-slate-200">
               {generatingProgress === 0
                 ? '🔍 Analisando o texto da homenagem...'
-                : generatingProgress === 1
-                ? '🎨 Nossa IA está pintando as ilustrações em aquarela...'
-                : `✅ Ilustração ${generatingProgress - 1} gerada! Finalizando...`}
+                : generatingProgress > imageCount
+                ? '✅ Ilustrações prontas! Finalizando...'
+                : `🎨 Gerando ilustração ${generatingProgress - 1} de ${imageCount}...`}
             </p>
             <p className="text-xs text-slate-500">
-              Geração de imagem real por IA — pode levar alguns segundos
+              Geração de imagem real por IA — cada ilustração leva de 10 a 20 segundos, então pode
+              levar até {Math.ceil(imageCount / 2) * 20}s no total. Vale a pena esperar!
             </p>
           </div>
-          {/* Progress dots */}
+          {/* Progress dots — uma por ilustração (mais o passo inicial de análise do texto) */}
           <div className="flex items-center justify-center gap-2">
-            {[0, 1, 2].map((step) => (
+            {Array.from({ length: imageCount }, (_, step) => step).map((step) => (
               <div
                 key={step}
                 className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
-                  generatingProgress > step ? 'bg-amber-400 scale-110' : 'bg-slate-700'
+                  generatingProgress > step + 1 ? 'bg-amber-400 scale-110' : 'bg-slate-700'
                 }`}
               />
             ))}
