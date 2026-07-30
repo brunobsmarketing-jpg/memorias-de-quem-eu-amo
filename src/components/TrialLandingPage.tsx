@@ -47,6 +47,15 @@ export const TrialLandingPage: React.FC<TrialLandingPageProps> = ({ onStart }) =
 
   return (
     <div className="max-w-3xl mx-auto space-y-10 py-6">
+      {/* Logo — reforça confiança logo de cara pra quem chega de anúncio sem contexto nenhum.
+          logo-icon.png tem fundo opaco (não é PNG transparente), então usa o mesmo tratamento
+          do cabeçalho principal (App.tsx): cantos arredondados + sombra, em vez do logo-full.png
+          "cru" (que tem bastante espaço em branco em volta e destoa do fundo creme da página). */}
+      <div className="flex justify-center items-center gap-2.5">
+        <img src="/logo-icon.png" alt="Memora" className="w-9 h-9 rounded-xl shadow-md" />
+        <span className="font-extrabold text-lg tracking-tight text-slate-100">Memora</span>
+      </div>
+
       {/* Hero */}
       <div className="text-center space-y-4">
         <div className="flex flex-wrap items-center justify-center gap-2">
