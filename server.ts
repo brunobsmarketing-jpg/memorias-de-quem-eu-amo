@@ -153,7 +153,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' });
 
 // API Routes
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', app: 'Memórias de Quem Eu Amo' });
+  res.json({ status: 'ok', app: 'Memora' });
 });
 
 // Envia um arquivo (foto, áudio, imagem gerada por IA) em base64 para o Supabase Storage
@@ -339,7 +339,7 @@ app.post('/api/checkout/create-preference', accountLimiter, requireOwnership, as
         items: [
           {
             id: pkg.id,
-            title: pkg.description || `${pkg.credits} crédito(s) — Memórias de Quem Eu Amo`,
+            title: pkg.description || `${pkg.credits} crédito(s) — Memora`,
             quantity: 1,
             unit_price: pkg.priceBRL,
             currency_id: 'BRL',
@@ -1393,7 +1393,7 @@ async function setupServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server "Memórias de Quem Eu Amo" ativo em http://0.0.0.0:${PORT}`);
+    console.log(`Server "Memora" ativo em http://0.0.0.0:${PORT}`);
   });
 }
 

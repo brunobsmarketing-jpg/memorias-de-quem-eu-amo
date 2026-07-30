@@ -302,12 +302,14 @@ export default function App() {
             onClick={() => setCurrentView('home')}
             className="flex items-center gap-2.5 cursor-pointer group"
           >
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-black shadow-md group-hover:scale-105 transition-transform">
-              <Heart className="w-5 h-5 fill-slate-950" />
-            </div>
+            <img
+              src="/logo-icon.png"
+              alt="Memora"
+              className="w-9 h-9 rounded-xl shadow-md group-hover:scale-105 transition-transform"
+            />
             <div>
               <span className="font-extrabold text-base tracking-tight text-slate-100 block group-hover:text-amber-400 transition-colors">
-                Memórias de Quem Eu Amo
+                Memora
               </span>
               <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider block">
                 {user?.isPaidMember ? 'Área de Membros VIP' : 'Acesso Exclusivo para Assinantes'}
@@ -500,7 +502,7 @@ export default function App() {
       {/* Global Footer */}
       <footer className="bg-slate-950 border-t border-slate-900 py-8 px-4 text-center text-xs text-slate-500 space-y-2 mt-12">
         <p className="font-medium text-slate-400">
-          Memórias de Quem Eu Amo © 2026 — Plataforma Exclusiva de Homenagens
+          Memora © 2026 — Plataforma Exclusiva de Homenagens
         </p>
         <p>Acesso exclusivo para membros pagantes com gerador poético por IA, gravação de voz e cartões interativos.</p>
         {user && user.isPaidMember && (

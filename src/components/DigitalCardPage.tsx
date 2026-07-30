@@ -139,7 +139,7 @@ export const DigitalCardPage: React.FC<DigitalCardPageProps> = ({ video, onGoHom
 
       ctx.fillStyle = '#e2e8f0';
       ctx.font = '24px sans-serif';
-      ctx.fillText('Criado com carinho em "Memórias de Quem Eu Amo"', 600, 1420);
+      ctx.fillText('Criado com carinho em "Memora"', 600, 1420);
       ctx.shadowBlur = 0;
 
       const link = document.createElement('a');

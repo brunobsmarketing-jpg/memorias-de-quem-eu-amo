@@ -1,7 +1,7 @@
 import { Resend } from 'resend';
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
-const EMAIL_FROM = process.env.EMAIL_FROM || 'Memórias de Quem Eu Amo <acesso@mail.memoriasdequemeuamo.com.br>';
+const EMAIL_FROM = process.env.EMAIL_FROM || 'Memora <acesso@mail.memoriasdequemeuamo.com.br>';
 const APP_LOGIN_URL = (process.env.APP_URL || 'https://app.memoriasdequemeuamo.com.br').replace(/\/$/, '');
 
 export function isEmailConfigured(): boolean {
@@ -30,7 +30,7 @@ export async function sendAccessGrantedEmail(params: { to: string; name?: string
     <div style="font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; color: #1e293b;">
       <p style="font-size: 20px; font-weight: 700; margin: 0 0 16px;">${greeting} 💛</p>
       <p style="font-size: 15px; line-height: 1.6; margin: 0 0 16px;">
-        Seu pagamento foi confirmado e seu acesso à <strong>Memórias de Quem Eu Amo</strong> já está liberado,
+        Seu pagamento foi confirmado e seu acesso à <strong>Memora</strong> já está liberado,
         com <strong>${params.credits} crédito(s)</strong> na sua conta — cada crédito gera um vídeo ou Livro de
         Memórias completo, em HD, sem marca d'água.
       </p>
@@ -47,7 +47,7 @@ export async function sendAccessGrantedEmail(params: { to: string; name?: string
     </div>
   `.trim();
 
-  const text = `${greeting}\n\nSeu pagamento foi confirmado e seu acesso à Memórias de Quem Eu Amo já está liberado, com ${params.credits} crédito(s) na sua conta.\n\nPara entrar, acesse ${APP_LOGIN_URL} e informe o mesmo e-mail da compra (${params.to}) — não é preciso senha.`;
+  const text = `${greeting}\n\nSeu pagamento foi confirmado e seu acesso à Memora já está liberado, com ${params.credits} crédito(s) na sua conta.\n\nPara entrar, acesse ${APP_LOGIN_URL} e informe o mesmo e-mail da compra (${params.to}) — não é preciso senha.`;
 
   try {
     const { error } = await resend.emails.send({

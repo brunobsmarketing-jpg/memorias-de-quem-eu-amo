@@ -4,57 +4,63 @@
   --font-sans: 'Poppins', ui-sans-serif, system-ui, sans-serif;
   --font-serif: 'Fraunces', Georgia, serif;
 
-  /* Acento emocional (terracota) — reservado para os poucos momentos de afeto explícito
-     (ícones de coração, palavra "amor"), separado do dourado/amber usado para CTAs e
-     elementos de valor/premium. */
-  --color-ember-400: #d98a8e;
-  --color-ember-500: #c1666b;
-  --color-ember-600: #a84e53;
-  --color-ember-700: #8a3d42;
+  /* Acento emocional (terracota → roxo Memora) — reservado para os poucos momentos de
+     afeto explícito (ícones de coração, palavra "amor"), separado do laranja/amber usado
+     para CTAs e elementos de valor/premium. Alinhado à identidade visual da marca Memora
+     (ver logo e memora.html): laranja #F5941E → rosa #EC3E82 → roxo #7B3FF2. */
+  --color-ember-400: #9163f5;
+  --color-ember-500: #7b3ff2;
+  --color-ember-600: #6a2fe0;
+  --color-ember-700: #5623b8;
 }
 
 body {
   font-family: var(--font-sans);
 }
 
-/* Modo claro — preto, branco e azul DeepSkyBlue (#00BFFF), visual limpo.
-   Funciona redefinindo as MESMAS variáveis de cor do Tailwind (--color-slate-*,
-   --color-amber-*, --color-orange-*, --color-ember-*) usadas em todo o app — nenhuma
-   classNames precisou mudar, só o valor por trás de cada token quando data-theme="light"
-   está ativo no <html>. Meta padrão continua o modo escuro (dark) já existente. */
+/* Modo claro — paleta oficial da marca Memora (mesmas cores da logo e da página de vendas
+   memora.html): creme quente de fundo, tinta roxo-escura para texto, e o gradiente
+   laranja → rosa → roxo como acento. Funciona redefinindo as MESMAS variáveis de cor do
+   Tailwind (--color-slate-*, --color-amber-*, --color-orange-*, --color-ember-*) usadas em
+   todo o app — nenhuma className precisou mudar, só o valor por trás de cada token quando
+   data-theme="light" está ativo no <html>. Meta padrão continua o modo escuro (dark) já
+   existente, que fica só com o toque leve de roxo no ember (acima) por enquanto.
+   Referência de cores: --c-cream:#FBF5EC --c-cream-2:#F3EADB --c-ink:#221A33
+   --c-ink-soft:#5C5470 --c-orange:#F5941E --c-pink:#EC3E82 --c-purple:#7B3FF2 */
 :root[data-theme='light'] {
-  /* Neutros: fundo branco, texto preto, escala de cinza só pro meio-termo (bordas/cards) */
-  --color-slate-950: #ffffff;
-  --color-slate-900: #f7f8fa;
-  --color-slate-800: #e7e9ed;
-  --color-slate-700: #d3d7de;
-  --color-slate-600: #9ca3af;
-  --color-slate-500: #6b7280;
-  --color-slate-400: #52525b;
-  --color-slate-300: #3f3f46;
-  --color-slate-200: #27272a;
-  --color-slate-100: #0a0a0a;
+  /* Neutros: fundo creme (--c-cream), cards brancos, escala de "tinta" roxo-escura pro
+     texto — substitui o cinza puro por um tom levemente roxo, coerente com --c-ink. */
+  --color-slate-950: #fbf5ec;
+  --color-slate-900: #ffffff;
+  --color-slate-800: #f3eadb;
+  --color-slate-700: #e8d9c2;
+  --color-slate-600: #7a7191;
+  --color-slate-500: #665d80;
+  --color-slate-400: #5c5470;
+  --color-slate-300: #453d5c;
+  --color-slate-200: #2e2645;
+  --color-slate-100: #221a33;
 
-  /* Acento: dourado/amber e laranja viram a mesma família de azul DeepSkyBlue.
+  /* Acento: laranja/amber e "orange" viram o gradiente laranja → rosa → roxo da marca.
      amber-400 é usado em ~50 lugares como cor de TEXTO/ícone (não só fundo de botão) —
-     por isso não pode ser o "#00BFFF" claro pedido (contraste de ~2:1 num fundo branco,
-     ilegível). amber-500 (só usado como fundo sólido de botão, sempre com texto preto
-     em cima) pode ficar mais vívido/próximo do tom pedido, já que ali quem garante a
-     leitura é o texto preto, não a cor de fundo em si. */
-  --color-amber-200: #0077b6;
-  --color-amber-300: #0077b6;
-  --color-amber-400: #0077b6;
-  --color-amber-500: #00a8e8;
-  --color-orange-400: #0096c7;
-  --color-orange-500: #023e73;
+     por isso vira o rosa (--c-pink), vívido o bastante pra ler bem em fundo creme/branco
+     (mesmo tom usado no "eyebrow" da página de vendas). amber-500 (fundo sólido de botão,
+     sempre com texto preto em cima) vira o laranja (--c-orange) da marca. orange-400/500
+     completam o gradiente rumo ao roxo (--c-purple), usados nos CTAs em gradiente
+     ("from-amber-500 to-orange-500"). */
+  --color-amber-200: #ec3e82;
+  --color-amber-300: #ec3e82;
+  --color-amber-400: #ec3e82;
+  --color-amber-500: #f5941e;
+  --color-orange-400: #9163f5;
+  --color-orange-500: #7b3ff2;
 
-  /* Ember (terracota) também vira azul no modo claro, mantendo só as 3 cores pedidas —
-     mesma lógica de contraste do amber (ember-400 é usado como cor de ícone/texto). */
-  --color-ember-400: #0077b6;
-  --color-ember-500: #00a8e8;
+  /* Ember (terceiro acento emocional) fica no roxo puro da marca no modo claro também. */
+  --color-ember-400: #7b3ff2;
+  --color-ember-500: #6a2fe0;
 
   /* Verde de sucesso e vermelho de erro/aviso também são usados como cor de texto — os
-     tons padrão (pensados pra fundo escuro) ficam quase ilegíveis em fundo branco. */
+     tons padrão (pensados pra fundo escuro) ficam quase ilegíveis em fundo claro. */
   --color-emerald-300: #15803d;
   --color-emerald-400: #15803d;
   --color-rose-300: #b91c1c;

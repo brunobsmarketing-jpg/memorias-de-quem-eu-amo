@@ -1,4 +1,4 @@
--- Memórias de Quem Eu Amo — esquema inicial do banco de dados
+-- Memora — esquema inicial do banco de dados
 -- Rode este script uma vez no SQL Editor do Supabase (dashboard do projeto > SQL Editor > New query > Run)
 
 create table if not exists app_users (

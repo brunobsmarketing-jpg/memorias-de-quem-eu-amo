@@ -1,5 +1,5 @@
 {
-  "name": "Memórias de Quem Eu Amo",
+  "name": "Memora",
   "description": "SaaS para criação de vídeos e cartões digitais emocionantes para o Dia dos Pais e entes queridos com fotos, IA e narração.",
   "requestFramePermissions": ["camera", "microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
