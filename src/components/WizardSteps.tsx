@@ -1035,14 +1035,28 @@ export const Step5AIImagesOption: React.FC<Step5AIImagesProps> = ({
       const themes = await extractVisualThemesFromText(tributeText, fatherName, imageCount, memoryAge, narratorGender);
       setGeneratingProgress(1); // temas extraídos
 
-      const generatedList = await Promise.all(
-        themes.map(async (t) => {
-          const url = await generateAIIllustrationImage(t.titlePt, t.promptEn, selectedImageStyle);
-          setGeneratingProgress((prev) => prev + 1);
-          return { prompt: t.titlePt, url };
-        })
-      );
+      // Uma de cada vez, não Promise.all — a OpenAI limita o gpt-image-1 a poucas imagens por
+      // minuto na conta inteira, e disparar todas de uma vez estourava esse limite quase sempre
+      // (visto direto nos logs de produção), fazendo várias cenas caírem no desenho de fallback
+      // local em vez da ilustração de IA de verdade. Gerando em sequência, cada chamada já leva
+      // vários segundos sozinha, o que naturalmente espaça os pedidos dentro do limite.
+      const generatedList: { prompt: string; url: string }[] = [];
+      let fallbackCount = 0;
+      for (const t of themes) {
+        const result = await generateAIIllustrationImage(t.titlePt, t.promptEn, selectedImageStyle);
+        if (result.isFallback) fallbackCount++;
+        generatedList.push({ prompt: t.titlePt, url: result.url });
+        setGeneratingProgress((prev) => prev + 1);
+      }
       setAiImages(generatedList);
+
+      if (fallbackCount > 0) {
+        toast.warning(
+          fallbackCount === generatedList.length
+            ? 'Não foi possível gerar as ilustrações de IA agora (alta demanda). Usamos imagens de reserva — clique no botão acima de novo pra tentar as ilustrações de verdade.'
+            : `${fallbackCount} de ${generatedList.length} ilustrações usaram imagem de reserva (alta demanda na IA). Clique no botão acima de novo pra tentar gerar todas com IA.`
+        );
+      }
     } catch (e) {
       console.error(e);
     } finally {

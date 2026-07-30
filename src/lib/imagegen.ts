@@ -52,6 +52,14 @@ export async function extractVisualThemesFromText(
   }
 }
 
+export interface GeneratedIllustration {
+  url: string;
+  // true quando a chamada real à OpenAI falhou e caiu no desenho local de canvas (ver
+  // generateCanvasFallback) — usado pelo wizard pra avisar o usuário que aquela cena específica
+  // não é a ilustração de IA de verdade, em vez de deixar passar em silêncio.
+  isFallback: boolean;
+}
+
 /**
  * Gera uma ilustração artística usando a API de geração de imagem da OpenAI, no estilo escolhido
  * pelo usuário (aquarela, realista, pintura a óleo, etc.). Retorna uma data URL (base64) da
@@ -61,7 +69,7 @@ export async function generateAIIllustrationImage(
   title: string,
   themePrompt: string,
   style: string = 'watercolor'
-): Promise<string> {
+): Promise<GeneratedIllustration> {
   try {
     const response = await fetch('/api/generate-ai-image', {
       method: 'POST',
@@ -79,11 +87,22 @@ export async function generateAIIllustrationImage(
       throw new Error('Resposta sem imagem válida');
     }
 
-    return data.imageDataUrl;
+    return { url: data.imageDataUrl, isFallback: false };
   } catch (e) {
     console.warn('API de geração de imagem falhou, usando fallback canvas:', e);
-    return generateCanvasFallback(title, themePrompt);
+    return { url: generateCanvasFallback(title, themePrompt), isFallback: true };
   }
+}
+
+/** Hash simples de string (djb2) — determinístico, só pra derivar uma variação visual estável
+ * a partir do título/prompt de cada cena (mesmo texto sempre gera a mesma variação, mas cenas
+ * diferentes tendem a cair em variações diferentes). */
+function hashString(s: string): number {
+  let hash = 5381;
+  for (let i = 0; i < s.length; i++) {
+    hash = (hash * 33) ^ s.charCodeAt(i);
+  }
+  return Math.abs(hash);
 }
 
 /**
@@ -97,8 +116,16 @@ function generateCanvasFallback(title: string, themePrompt: string): string {
   const ctx = canvas.getContext('2d');
   if (!ctx) return '';
 
-  const isSunset = themePrompt.toLowerCase().includes('sunset') || themePrompt.toLowerCase().includes('pôr do sol') || themePrompt.toLowerCase().includes('father');
-  const isNature = themePrompt.toLowerCase().includes('tree') || themePrompt.toLowerCase().includes('nature') || themePrompt.toLowerCase().includes('forest');
+  const lowerPrompt = themePrompt.toLowerCase();
+  const isSunset = lowerPrompt.includes('sunset') || lowerPrompt.includes('pôr do sol') || lowerPrompt.includes('father');
+  const isNature = lowerPrompt.includes('tree') || lowerPrompt.includes('nature') || lowerPrompt.includes('forest');
+  // Como quase toda cena de homenagem cai nos dois "if" acima (o prompt do servidor sempre
+  // menciona pai/pôr do sol como símbolo — ver contextInstruction em server.ts), sem isso todas
+  // as cenas em fallback saíam visualmente idênticas, só com o título mudando. O hash do próprio
+  // texto da cena garante variação real (posição do sol, espelhamento da silhueta, tom de cor)
+  // mesmo quando isSunset/isNature dão o mesmo resultado em todas.
+  const variantSeed = hashString(title + themePrompt);
+  const flip = variantSeed % 2 === 1;
 
   // --- Background sky gradient ---
   const skyGrad = ctx.createLinearGradient(0, 0, 0, 750);
@@ -191,6 +218,15 @@ function generateCanvasFallback(title: string, themePrompt: string): string {
   ctx.closePath();
   ctx.fill();
 
+  // Espelha a composição inteira (árvore + silhuetas + coração) quando o hash da cena "sorteia"
+  // flip=true — mesmo com isSunset/isNature iguais em todas as cenas, isso já muda a leitura
+  // visual o suficiente pra não parecer a mesma imagem repetida (ver comentário do hash acima).
+  ctx.save();
+  if (flip) {
+    ctx.translate(1080, 0);
+    ctx.scale(-1, 1);
+  }
+
   // --- Tree (left side) ---
   if (!isSunset || isNature) {
     ctx.fillStyle = 'rgba(15, 30, 15, 0.8)';
@@ -264,7 +300,9 @@ function generateCanvasFallback(title: string, themePrompt: string): string {
   ctx.bezierCurveTo(heartX + 8, heartY, heartX, heartY + 8, heartX, heartY + 14);
   ctx.fill();
 
-  // --- Title badge ---
+  ctx.restore();
+
+  // --- Title badge (nunca espelhado — texto ficaria de trás pra frente) ---
   ctx.fillStyle = 'rgba(10, 10, 20, 0.72)';
   const badgeY = 60;
   const badgeH = 130;

@@ -147,8 +147,10 @@ function splitIntoSentences(text: string): string[] {
     .filter(Boolean);
 }
 
-/** Quebra um texto em linhas curtas para caber na legenda queimada no vídeo. */
-function wrapTextForSubtitle(text: string, maxCharsPerLine = 28, maxLines = 3): string {
+/** Quebra um texto em linhas curtas para caber na legenda queimada no vídeo. Devolve um array
+ * (uma linha por item) — ver comentário em buildCaptionFilters sobre por que não juntamos tudo
+ * num "\n" só dentro de um único drawtext. */
+function wrapTextForSubtitle(text: string, maxCharsPerLine = 28, maxLines = 3): string[] {
   const words = text.split(/\s+/).filter(Boolean);
   const lines: string[] = [];
   let current = '';
@@ -165,11 +167,93 @@ function wrapTextForSubtitle(text: string, maxCharsPerLine = 28, maxLines = 3): 
   if (current) lines.push(current);
 
   if (lines.length > maxLines) {
-    const head = lines.slice(0, maxLines - 1);
-    const tail = lines.slice(maxLines - 1).join(' ');
-    return [...head, tail].join('\n');
+    // Antes disso, o "resto" além do limite de linhas era colado inteiro na última linha (sem
+    // recortar) — pra frases bem longas isso gerava uma linha gigante, muito mais larga que o
+    // quadro, cortada nas duas bordas (bug real visto em teste). Agora trunca com reticências,
+    // garantindo que TODA linha devolvida — inclusive a última — respeita maxCharsPerLine.
+    const visible = lines.slice(0, maxLines);
+    const lastIdx = maxLines - 1;
+    // "…" (um caractere só) não existe no glyph set de todas as fontes empacotadas — aparecia
+    // como um quadradinho de "caractere ausente" em vez de reticências. "..." (3 pontos ASCII)
+    // existe em qualquer fonte.
+    const ellipsis = '...';
+    let last = visible[lastIdx];
+    if (last.length + ellipsis.length > maxCharsPerLine) {
+      last = last.slice(0, Math.max(0, maxCharsPerLine - ellipsis.length)).trimEnd();
+    }
+    visible[lastIdx] = last + ellipsis;
+    return visible;
   }
-  return lines.join('\n');
+  return lines;
+}
+
+/**
+ * Gera os filtros de uma legenda (um trecho do texto, já quebrado em linhas) pro FFmpeg.
+ *
+ * IMPORTANTE: antes disso, todas as linhas de uma legenda multi-linha eram escritas num único
+ * arquivo separadas por "\n" e desenhadas com UM drawtext (x=(w-text_w)/2 pra centralizar). O
+ * drawtext do FFmpeg tem um bug/limitação conhecida com texto multi-linha: "text_w" não reflete
+ * de forma confiável a largura da linha mais larga do bloco, então o "(w-text_w)/2" centralizava
+ * errado — na prática as legendas saíam cortadas nas duas bordas da tela (bug real visto em
+ * teste, vídeo com texto tipo "...paciência, carinho e exemplo o que rea[cortado]"). Centralizar
+ * texto de UMA linha por vez com "(w-text_w)/2" funciona certo — então aqui cada linha vira seu
+ * próprio drawtext, empilhadas verticalmente, com um retângulo de fundo (drawbox) desenhado por
+ * baixo cobrindo o bloco inteiro em vez de uma "box" por linha do drawtext.
+ */
+function buildCaptionFilters(
+  videoLabel: string,
+  lines: string[],
+  caption: { fontPath: string; fontColor: string; backgroundId: string },
+  outputWidth: number,
+  outputHeight: number,
+  start: number,
+  end: number,
+  idx: number,
+  tempFilesToDelete: string[]
+): { filters: string[]; videoLabel: string } {
+  const FONT_SIZE = 42;
+  const LINE_HEIGHT = 58;
+  const BOTTOM_MARGIN = 150; // distância do fundo do quadro até a base do bloco de legenda
+  const BOX_PADDING_V = 22;
+  const BOX_PADDING_H = 60;
+
+  const blockHeight = lines.length * LINE_HEIGHT;
+  const blockBottomY = outputHeight - BOTTOM_MARGIN;
+  const blockTopY = blockBottomY - blockHeight;
+  const enableExpr = `between(t,${start.toFixed(2)},${end.toFixed(2)})`;
+
+  const filters: string[] = [];
+  let label = videoLabel;
+
+  if (caption.backgroundId !== 'none') {
+    const boxColor = caption.backgroundId === 'light' ? 'white@0.75' : 'black@0.55';
+    const boxWidth = outputWidth - BOX_PADDING_H * 2;
+    const boxY = blockTopY - BOX_PADDING_V;
+    const boxHeight = blockHeight + BOX_PADDING_V * 2;
+    const outLabel = `vsubbox${idx}`;
+    filters.push(
+      `[${label}]drawbox=x=${BOX_PADDING_H}:y=${boxY}:w=${boxWidth}:h=${boxHeight}:` +
+      `color=${boxColor}:t=fill:enable='${enableExpr}'[${outLabel}]`
+    );
+    label = outLabel;
+  }
+
+  const textOutline = caption.backgroundId === 'none' ? 'borderw=3:bordercolor=black@0.7' : '';
+
+  lines.forEach((line, lineIdx) => {
+    const linePath = writeTempTextFile(line, `sub_${idx}_${lineIdx}`);
+    tempFilesToDelete.push(linePath);
+    const lineY = blockTopY + lineIdx * LINE_HEIGHT;
+    const outLabel = `vsub${idx}_${lineIdx}`;
+    filters.push(
+      `[${label}]drawtext=textfile=${quoteFilterPath(linePath)}:fontfile=${quoteFilterPath(caption.fontPath)}:` +
+      `fontsize=${FONT_SIZE}:fontcolor=${caption.fontColor}:${textOutline}:` +
+      `x=(w-text_w)/2:y=${lineY}:enable='${enableExpr}'[${outLabel}]`
+    );
+    label = outLabel;
+  });
+
+  return { filters, videoLabel: label };
 }
 
 /**
@@ -321,12 +405,6 @@ export async function renderVideoWithFFmpeg(params: RenderVideoParams): Promise<
       // --- Legendas queimadas, sincronizadas por trecho do texto, com a tipografia/cor/fundo
       // escolhidos pelo usuário no wizard ---
       const caption = resolveCaptionStyle(params.captionStyle);
-      const captionBoxParams =
-        caption.backgroundId === 'none'
-          ? 'borderw=3:bordercolor=black@0.7'
-          : caption.backgroundId === 'light'
-          ? 'box=1:boxcolor=white@0.75:boxborderw=24'
-          : 'box=1:boxcolor=black@0.55:boxborderw=24';
 
       const sentences = splitIntoSentences(params.tributeText);
       if (sentences.length > 0) {
@@ -336,22 +414,20 @@ export async function renderVideoWithFFmpeg(params: RenderVideoParams): Promise<
         // pela proporção de caracteres dela sobre o texto inteiro, que acompanha bem melhor o
         // ritmo real da fala do que uma divisão por contagem de frases.
         const totalChars = sentences.reduce((sum, s) => sum + s.length, 0) || 1;
+        // O formato vertical (9:16) tem bem mais altura sobrando embaixo do vídeo do que o
+        // clássico (1:1) — aproveita isso pra permitir mais linhas antes de precisar truncar
+        // frases longas com reticências.
+        const maxCaptionLines = outputHeight > 1500 ? 5 : 3;
         let cursor = 0;
         sentences.forEach((sentence, idx) => {
           const chunkDuration = (sentence.length / totalChars) * totalDuration;
           const start = cursor;
           const end = cursor + chunkDuration;
           cursor = end;
-          const wrapped = wrapTextForSubtitle(sentence);
-          const subPath = writeTempTextFile(wrapped, `sub_${idx}`);
-          tempFilesToDelete.push(subPath);
-          const outLabel = `vsub${idx}`;
-          filters.push(
-            `[${videoLabel}]drawtext=textfile=${quoteFilterPath(subPath)}:fontfile=${quoteFilterPath(caption.fontPath)}:` +
-            `fontsize=42:fontcolor=${caption.fontColor}:line_spacing=8:${captionBoxParams}:` +
-            `x=(w-text_w)/2:y=h-300:enable='between(t,${start.toFixed(2)},${end.toFixed(2)})'[${outLabel}]`
-          );
-          videoLabel = outLabel;
+          const lines = wrapTextForSubtitle(sentence, 28, maxCaptionLines);
+          const result = buildCaptionFilters(videoLabel, lines, caption, outputWidth, outputHeight, start, end, idx, tempFilesToDelete);
+          filters.push(...result.filters);
+          videoLabel = result.videoLabel;
         });
       }
 

@@ -1277,6 +1277,10 @@ Colors: warm soft pastel palette with a few bold accent tones.`,
 Colors: black and white with subtle warm sepia undertones.`,
 };
 
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 // 3. Generate AI Illustration Image using OpenAI (gpt-image-1)
 app.post('/api/generate-ai-image', expensiveAiLimiter, async (req, res) => {
   try {
@@ -1293,15 +1297,35 @@ Rules: NO realistic recognizable faces, NO text or letters anywhere in the image
 Mood: warm, nostalgic, heartfelt, loving, emotional.
 Scene theme: ${prompt}`;
 
-    const response = await openai.images.generate({
-      model: 'gpt-image-1',
-      prompt: fullPrompt,
-      n: 1,
-      size: '1024x1024',
-      // Sem isso, o parâmetro fica em "auto" e a API pode escolher qualidade "high" (até ~4x
-      // mais caro que "medium") sem avisar — trava o custo num teto previsível por imagem.
-      quality: 'medium',
-    });
+    // O wizard gera várias cenas em sequência (ver Step5AIImagesOption em WizardSteps.tsx), mas
+    // o limite da OpenAI pro gpt-image-1 é por conta inteira (hoje 5 imagens/min) — outra pessoa
+    // gerando ao mesmo tempo pode fazer esse pedido esbarrar no limite mesmo sem culpa nossa.
+    // Em vez de cair direto pro fallback local (que sem isso ficava parecido demais entre cenas —
+    // ver generateCanvasFallback em imagegen.ts), espera um pouco e tenta de novo antes de desistir.
+    let response: any = null;
+    let lastError: any = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        response = await openai.images.generate({
+          model: 'gpt-image-1',
+          prompt: fullPrompt,
+          n: 1,
+          size: '1024x1024',
+          // Sem isso, o parâmetro fica em "auto" e a API pode escolher qualidade "high" (até ~4x
+          // mais caro que "medium") sem avisar — trava o custo num teto previsível por imagem.
+          quality: 'medium',
+        });
+        lastError = null;
+        break;
+      } catch (err: any) {
+        lastError = err;
+        const isRateLimit = err?.status === 429 || err?.code === 'rate_limit_exceeded';
+        if (!isRateLimit || attempt === 1) throw err;
+        console.warn(`⚠️ Rate limit do gpt-image-1 — tentando de novo em 15s (tentativa ${attempt + 2}/2)...`);
+        await wait(15000);
+      }
+    }
+    if (!response) throw lastError;
 
     const b64Image = response.data?.[0]?.b64_json;
     const imageUrl = response.data?.[0]?.url;
