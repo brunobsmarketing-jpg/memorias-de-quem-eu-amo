@@ -19,12 +19,13 @@ import {
   MousePointerClick,
   Smartphone,
 } from 'lucide-react';
-import { PhotoItem, AITextPromptData, PresetVoice, PresetTrack, AspectRatioOption } from '../types';
+import { PhotoItem, AITextPromptData, PresetVoice, PresetTrack, AspectRatioOption, CaptionStyle } from '../types';
 import { PRESET_VOICES, PRESET_TRACKS, AI_IMAGE_STYLES, MAX_TRIBUTE_TEXT_CHARS } from '../data/presets';
 import { generateAITributeText } from '../lib/textgen';
 import { extractVisualThemesFromText, generateAIIllustrationImage, VisualTheme } from '../lib/imagegen';
 import { VoiceRecorder, synthesizeTTSNarration, cloneVoiceAndSynthesize } from '../lib/voice';
 import { resizeImageToDataUrl, MAX_UPLOAD_FILE_SIZE_BYTES, formatFileSizeMB } from '../lib/imageUtils';
+import { CaptionStyleEditor } from './CaptionStyleEditor';
 
 /** Aviso fixo no topo de cada etapa explicando exatamente o que a pessoa precisa fazer
     para poder avançar — complementa as mensagens de validação que só aparecem quando
@@ -837,6 +838,10 @@ interface Step4MusicProps {
   // seletor genérico em vez de duplicar esse bloco de UI em dois lugares.
   classicFormatLabel: string;
   classicFormatDescription: string;
+  // Só o CreateVideoWizard passa essas duas — o Livro de Memórias não queima legenda no vídeo
+  // final (o texto já vai escrito direto nas páginas), então nem faz sentido escolher aqui.
+  captionStyle?: CaptionStyle;
+  setCaptionStyle?: (style: CaptionStyle) => void;
   onNext: () => void;
   onBack: () => void;
 }
@@ -848,6 +853,8 @@ export const Step4MusicTrack: React.FC<Step4MusicProps> = ({
   setAspectRatio,
   classicFormatLabel,
   classicFormatDescription,
+  captionStyle,
+  setCaptionStyle,
   onNext,
   onBack,
 }) => {
@@ -953,6 +960,13 @@ export const Step4MusicTrack: React.FC<Step4MusicProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Só o Vídeo Slideshow queima legenda no render final (o Livro de Memórias já escreve o
+          texto direto nas páginas) — CreateMemoryBookWizard não passa essas duas props, então
+          esse bloco fica invisível lá, sem precisar de um segundo Step4 separado só pra isso. */}
+      {captionStyle && setCaptionStyle && (
+        <CaptionStyleEditor captionStyle={captionStyle} onChange={setCaptionStyle} className="pt-2" />
+      )}
 
       <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 pt-4">
         <button

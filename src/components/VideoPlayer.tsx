@@ -3,19 +3,14 @@ import { toast } from 'sonner';
 import { Play, Pause, RotateCcw, Volume2, VolumeX, Download, Maximize, Minimize } from 'lucide-react';
 import { VideoJob, CaptionStyle } from '../types';
 import { drawVideoFrame, getAllSlides } from '../lib/video';
-import { PRESET_TRACKS, CAPTION_FONTS, CAPTION_COLORS, CAPTION_BACKGROUNDS } from '../data/presets';
+import { PRESET_TRACKS, DEFAULT_CAPTION_STYLE } from '../data/presets';
 import { fetchVideoJobRemote } from '../lib/videoApi';
 import { requestTrialVideoUnlock } from '../lib/trialVideoApi';
+import { CaptionStyleEditor } from './CaptionStyleEditor';
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
-
-const DEFAULT_CAPTION_STYLE: CaptionStyle = {
-  fontId: CAPTION_FONTS[0].id,
-  colorId: CAPTION_COLORS[0].id,
-  backgroundId: 'dark',
-};
 
 interface VideoPlayerProps {
   video: VideoJob;
@@ -564,71 +559,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaption
         )}
       </div>
 
-      {/* Personalização da Legenda */}
+      {/* Personalização da Legenda — a escolha inicial já acontece antes de gerar o vídeo (Passo 4
+          do wizard), isso aqui é só pra ajustar depois de ver o resultado final. */}
       {editableCaptionStyle && (
-        <div className="w-full max-w-lg mt-5 space-y-3 bg-slate-900 border border-slate-800 rounded-2xl p-4">
-          <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Estilo da Legenda</h4>
-
-          <div className="space-y-1.5">
-            <p className="text-[11px] text-slate-500 font-semibold">Tipografia</p>
-            <div className="grid grid-cols-5 gap-1.5">
-              {CAPTION_FONTS.map((font) => (
-                <button
-                  key={font.id}
-                  onClick={() => updateCaptionStyle({ fontId: font.id })}
-                  className={`py-2 rounded-lg border text-[11px] font-bold transition-all ${
-                    captionStyle.fontId === font.id
-                      ? 'bg-amber-500/20 border-amber-500 text-amber-300 ring-1 ring-amber-500'
-                      : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-slate-600'
-                  }`}
-                  style={{ fontFamily: `"${font.previewFontFamily}", sans-serif` }}
-                >
-                  {font.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <p className="text-[11px] text-slate-500 font-semibold">Cor do Texto</p>
-            <div className="grid grid-cols-5 gap-1.5">
-              {CAPTION_COLORS.map((color) => (
-                <button
-                  key={color.id}
-                  onClick={() => updateCaptionStyle({ colorId: color.id })}
-                  title={color.label}
-                  className={`h-9 rounded-lg border flex items-center justify-center transition-all ${
-                    captionStyle.colorId === color.id
-                      ? 'border-amber-500 ring-1 ring-amber-500'
-                      : 'border-slate-700 hover:border-slate-600'
-                  }`}
-                  style={{ backgroundColor: '#1e293b' }}
-                >
-                  <span className="w-4 h-4 rounded-full border border-white/20" style={{ backgroundColor: color.hex }} />
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <p className="text-[11px] text-slate-500 font-semibold">Fundo da Legenda</p>
-            <div className="grid grid-cols-3 gap-1.5">
-              {CAPTION_BACKGROUNDS.map((bg) => (
-                <button
-                  key={bg.id}
-                  onClick={() => updateCaptionStyle({ backgroundId: bg.id })}
-                  className={`py-2 rounded-lg border text-[11px] font-bold transition-all ${
-                    captionStyle.backgroundId === bg.id
-                      ? 'bg-amber-500/20 border-amber-500 text-amber-300 ring-1 ring-amber-500'
-                      : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-slate-600'
-                  }`}
-                >
-                  {bg.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
+        <CaptionStyleEditor
+          captionStyle={captionStyle}
+          onChange={updateCaptionStyle}
+          className="w-full max-w-lg mt-5"
+        />
       )}
 
       {/* Action Buttons */}

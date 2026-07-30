@@ -14,7 +14,7 @@ import { saveVideoJob } from '../lib/credits';
 import { uploadVideoJobMedia, saveVideoJobRemote } from '../lib/videoApi';
 import { saveTrialVideoRemote } from '../lib/trialVideoApi';
 import { deductCreditRemote } from '../lib/authApi';
-import { PRESET_VOICES, PRESET_TRACKS } from '../data/presets';
+import { PRESET_VOICES, PRESET_TRACKS, DEFAULT_CAPTION_STYLE } from '../data/presets';
 import { saveDraft, loadDraft, clearDraft } from '../lib/draftPersistence';
 
 interface CreateVideoWizardProps {
@@ -48,6 +48,7 @@ interface VideoWizardDraft {
   memoryAge: string;
   narratorGender: string;
   aspectRatio: AspectRatioOption;
+  captionStyle: CaptionStyle;
 }
 
 export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
@@ -88,6 +89,7 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
   const [memoryAge, setMemoryAge] = useState<string>(initialDraft?.memoryAge || 'auto');
   const [narratorGender, setNarratorGender] = useState<string>(initialDraft?.narratorGender || 'auto');
   const [aspectRatio, setAspectRatio] = useState<AspectRatioOption>(initialDraft?.aspectRatio || 'classic');
+  const [captionStyle, setCaptionStyle] = useState<CaptionStyle>(initialDraft?.captionStyle || DEFAULT_CAPTION_STYLE);
 
   // Salva o rascunho (com debounce) a cada mudança relevante, enquanto ainda não chegou na
   // prévia final — depois do Passo 6 o job já existe de verdade, não faz mais sentido "rascunhar".
@@ -112,13 +114,14 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
         memoryAge,
         narratorGender,
         aspectRatio,
+        captionStyle,
       });
     }, 800);
     return () => clearTimeout(timer);
   }, [
     currentStep, photos, aiOnlyMode, fatherName, authorName, tributeText, selectedVoiceId,
     isCustomVoice, customVoiceAudioUrl, skipNarration, selectedTrackId, useAIImages, aiImages,
-    selectedImageStyle, memoryAge, narratorGender, aspectRatio,
+    selectedImageStyle, memoryAge, narratorGender, aspectRatio, captionStyle,
   ]);
 
   const handleDiscardDraft = () => {
@@ -141,6 +144,7 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
     setMemoryAge('auto');
     setNarratorGender('auto');
     setAspectRatio('classic');
+    setCaptionStyle(DEFAULT_CAPTION_STYLE);
   };
 
   // Created Draft Job
@@ -201,6 +205,7 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
       useAIImages,
       aiGeneratedImages: aiImages,
       aspectRatio,
+      captionStyle,
       // No funil de prévia o vídeo começa 'draft' — só vira 'watermarked' quando a prévia com
       // marca d'água é renderizada (ver /api/render-video), e 'unlocked' só depois do pagamento.
       status: trialMode ? 'draft' : 'unlocked',
@@ -353,6 +358,8 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
             setAspectRatio={setAspectRatio}
             classicFormatLabel="Quadrado (1:1)"
             classicFormatDescription="Formato padrão — ideal para feed e WhatsApp"
+            captionStyle={captionStyle}
+            setCaptionStyle={setCaptionStyle}
             onNext={() => setCurrentStep(5)}
             onBack={() => setCurrentStep(3)}
           />

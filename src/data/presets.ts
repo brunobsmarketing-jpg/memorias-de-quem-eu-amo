@@ -1,4 +1,4 @@
-import { PresetVoice, PresetTrack, CreditPackage, AIImageStyle, CaptionFontOption, CaptionColorOption, CaptionBackgroundOption } from '../types';
+import { PresetVoice, PresetTrack, CreditPackage, AIImageStyle, CaptionFontOption, CaptionColorOption, CaptionBackgroundOption, CaptionStyle } from '../types';
 
 // Limite de caracteres do texto de homenagem (narração). Calculado a partir de dois limites
 // técnicos, não escolhido no chute:
@@ -39,6 +39,12 @@ export const CAPTION_BACKGROUNDS: CaptionBackgroundOption[] = [
   { id: 'dark', label: 'Fundo Escuro', description: 'Caixa escura semitransparente (padrão)' },
   { id: 'light', label: 'Fundo Claro', description: 'Caixa clara semitransparente' },
 ];
+
+export const DEFAULT_CAPTION_STYLE: CaptionStyle = {
+  fontId: CAPTION_FONTS[0].id,
+  colorId: CAPTION_COLORS[0].id,
+  backgroundId: 'dark',
+};
 
 export const AI_IMAGE_STYLES: AIImageStyle[] = [
   {
