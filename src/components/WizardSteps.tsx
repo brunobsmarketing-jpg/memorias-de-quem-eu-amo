@@ -840,8 +840,11 @@ interface Step4MusicProps {
   classicFormatDescription: string;
   // Só o CreateVideoWizard passa essas duas — o Livro de Memórias não queima legenda no vídeo
   // final (o texto já vai escrito direto nas páginas), então nem faz sentido escolher aqui.
+  // Partial<CaptionStyle> porque o CaptionStyleEditor manda só o campo que mudou (ex: só
+  // fontId) — quem recebe é que precisa mesclar com o valor atual, nunca substituir o objeto
+  // inteiro (bug real: substituir fazia escolher tipografia apagar a cor/fundo já escolhidos).
   captionStyle?: CaptionStyle;
-  setCaptionStyle?: (style: CaptionStyle) => void;
+  setCaptionStyle?: (partial: Partial<CaptionStyle>) => void;
   onNext: () => void;
   onBack: () => void;
 }

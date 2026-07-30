@@ -90,6 +90,12 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
   const [narratorGender, setNarratorGender] = useState<string>(initialDraft?.narratorGender || 'auto');
   const [aspectRatio, setAspectRatio] = useState<AspectRatioOption>(initialDraft?.aspectRatio || 'classic');
   const [captionStyle, setCaptionStyle] = useState<CaptionStyle>(initialDraft?.captionStyle || DEFAULT_CAPTION_STYLE);
+  // O CaptionStyleEditor manda só o campo que mudou (ex: {fontId: 'poppins'}) — precisa mesclar
+  // com o valor atual, nunca substituir o objeto inteiro (senão escolher a tipografia apagava a
+  // cor/fundo já escolhidos, e vice-versa).
+  const updateCaptionStyle = (partial: Partial<CaptionStyle>) => {
+    setCaptionStyle((prev) => ({ ...prev, ...partial }));
+  };
 
   // Salva o rascunho (com debounce) a cada mudança relevante, enquanto ainda não chegou na
   // prévia final — depois do Passo 6 o job já existe de verdade, não faz mais sentido "rascunhar".
@@ -359,7 +365,7 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
             classicFormatLabel="Quadrado (1:1)"
             classicFormatDescription="Formato padrão — ideal para feed e WhatsApp"
             captionStyle={captionStyle}
-            setCaptionStyle={setCaptionStyle}
+            setCaptionStyle={updateCaptionStyle}
             onNext={() => setCurrentStep(5)}
             onBack={() => setCurrentStep(3)}
           />
@@ -403,19 +409,10 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
               </p>
             </div>
 
-            <VideoPlayer
-              video={createdJob}
-              editableCaptionStyle
-              trialMode={trialMode}
-              onCaptionStyleChange={(style: CaptionStyle) => {
-                setCreatedJob((prev) => (prev ? { ...prev, captionStyle: style } : prev));
-                if (!trialMode) {
-                  saveVideoJobRemote({ ...createdJob, captionStyle: style }, user?.sessionToken || '').catch((err) =>
-                    console.warn('Falha ao salvar estilo de legenda no servidor:', err)
-                  );
-                }
-              }}
-            />
+            {/* O estilo da legenda já foi escolhido no Passo 4, antes do vídeo ser gerado — não
+                repete o seletor aqui (editableCaptionStyle fica de fora de propósito). Se quiser
+                mudar, é só voltar. */}
+            <VideoPlayer video={createdJob} trialMode={trialMode} />
 
             {isSyncing && (
               <div className="p-3 bg-slate-800/80 rounded-xl border border-slate-700 text-slate-300 text-xs font-semibold flex items-center justify-center gap-2">
@@ -429,14 +426,22 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
               </div>
             )}
 
-            {!trialMode && (
+            <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-center gap-3">
               <button
-                onClick={() => onFinish(createdJob)}
-                className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-extrabold text-sm rounded-xl shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2 mx-auto"
+                onClick={() => setCurrentStep(5)}
+                className="w-full sm:w-auto justify-center px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-sm rounded-xl border border-slate-700 flex items-center"
               >
-                <Sparkles className="w-4 h-4" /> Ver Cartão Digital e Compartilhar
+                Voltar
               </button>
-            )}
+              {!trialMode && (
+                <button
+                  onClick={() => onFinish(createdJob)}
+                  className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-extrabold text-sm rounded-xl shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2"
+                >
+                  <Sparkles className="w-4 h-4" /> Ver Cartão Digital e Compartilhar
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>
