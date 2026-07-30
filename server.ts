@@ -1,14 +1,84 @@
 import 'dotenv/config';
+import crypto from 'crypto';
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 import path from 'path';
 import OpenAI from 'openai';
 import { createServer as createViteServer } from 'vite';
 import fs from 'fs';
 import { supabaseAdmin, MEDIA_BUCKET } from './src/lib/supabaseAdmin';
+import { assertRequiredEnv, warnMissingEnv } from './src/lib/envCheck';
+import {
+  isMercadoPagoConfigured,
+  isMercadoPagoWebhookConfigured,
+  getMercadoPagoWebhookSecret,
+  mpPreferenceClient,
+  mpPaymentClient,
+} from './src/lib/mercadoPago';
+import { getCreditPackageById } from './src/lib/creditCatalog';
+import { WebhookSignatureValidator, InvalidWebhookSignatureError } from 'mercadopago';
+import { isPaytWebhookConfigured, getPaytWebhookSecret } from './src/lib/payt';
+import { getPaytProductById } from './src/lib/paytCatalog';
+
+// Falha rápido com uma mensagem clara se faltar uma env var essencial ao funcionamento básico
+// do app — evita crash-loops confusos como o que já aconteceu (ver src/lib/envCheck.ts).
+assertRequiredEnv([
+  { name: 'SUPABASE_URL', value: process.env.SUPABASE_URL },
+  { name: 'SUPABASE_SERVICE_ROLE_KEY', value: process.env.SUPABASE_SERVICE_ROLE_KEY },
+  { name: 'OPENAI_API_KEY', value: process.env.OPENAI_API_KEY },
+  { name: 'ELEVENLABS_API_KEY', value: process.env.ELEVENLABS_API_KEY },
+]);
+// Mercado Pago é opcional no boot (o app inteiro não deve cair só porque o pagamento ainda não
+// foi configurado) — as próprias rotas de pagamento recusam a operação com erro claro.
+warnMissingEnv([
+  { name: 'MERCADOPAGO_ACCESS_TOKEN', value: process.env.MERCADOPAGO_ACCESS_TOKEN },
+  { name: 'MERCADOPAGO_WEBHOOK_SECRET', value: process.env.MERCADOPAGO_WEBHOOK_SECRET },
+  { name: 'PAYT_WEBHOOK_SECRET', value: process.env.PAYT_WEBHOOK_SECRET },
+]);
 
 const app = express();
+// Railway roda atrás de um proxy — sem isso, express-rate-limit (e qualquer coisa que use
+// req.ip) enxerga o IP do proxy em toda requisição, não o do cliente real.
+app.set('trust proxy', 1);
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Limitadores de taxa: as rotas de IA custam dinheiro real por chamada (OpenAI/ElevenLabs) e as
+// de pagamento/sessão são alvo natural de força-bruta — nenhuma tinha proteção nenhuma antes.
+const aiGenerationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Muitas requisições em pouco tempo. Aguarde alguns minutos e tente novamente.' },
+});
+const expensiveAiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Muitas requisições em pouco tempo. Aguarde alguns minutos e tente novamente.' },
+});
+const renderLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Limite de renderizações por hora atingido. Tente novamente mais tarde.' },
+});
+const accountLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Muitas tentativas em pouco tempo. Aguarde um minuto e tente novamente.' },
+});
+const webhookLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Serve a pasta de vídeos renderizados em MP4
 const rendersPath = path.join(process.cwd(), 'public', 'renders');
@@ -86,7 +156,23 @@ app.get('/api/health', (req, res) => {
 
 // Envia um arquivo (foto, áudio, imagem gerada por IA) em base64 para o Supabase Storage
 // e devolve a URL pública permanente — usado para tirar as mídias do localStorage do navegador.
-app.post('/api/upload-media', async (req, res) => {
+const ALLOWED_UPLOAD_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+  'audio/mpeg',
+  'audio/mp4',
+  'audio/webm',
+  'audio/wav',
+  'audio/x-wav',
+  'video/webm',
+  'video/mp4',
+]);
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024; // 25MB — generoso o bastante pra fotos/áudio, sem deixar um único upload monopolizar o body limit de 50MB do servidor.
+
+app.post('/api/upload-media', accountLimiter, async (req, res) => {
   try {
     const { dataUrl, folder } = req.body;
     if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) {
@@ -96,8 +182,14 @@ app.post('/api/upload-media', async (req, res) => {
     const [meta, base64Data] = dataUrl.split(',');
     const mimeMatch = meta.match(/data:([^;]+);base64/);
     const mimeType = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+    if (!ALLOWED_UPLOAD_MIME_TYPES.has(mimeType)) {
+      return res.status(400).json({ error: `Tipo de arquivo não suportado: ${mimeType}` });
+    }
     const extension = mimeType.split('/')[1]?.split('+')[0] || 'bin';
     const buffer = Buffer.from(base64Data, 'base64');
+    if (buffer.length > MAX_UPLOAD_BYTES) {
+      return res.status(400).json({ error: `Arquivo muito grande (máximo ${MAX_UPLOAD_BYTES / (1024 * 1024)}MB).` });
+    }
 
     const safeFolder = (folder || 'misc').replace(/[^a-zA-Z0-9_/-]/g, '').replace(/\.\./g, '');
     const filePath = `${safeFolder}/${Date.now()}_${Math.random().toString(36).slice(2)}.${extension}`;
@@ -125,13 +217,62 @@ function mapUserRow(data: any) {
     isPaidMember: data.is_paid_member,
     planName: data.plan_name,
     createdAt: data.created_at,
+    sessionToken: data.session_token,
   };
+}
+
+/** Garante que o usuário tem um session_token — gera e persiste na primeira vez que faltar
+ * (contas criadas antes desta coluna existir, ou linhas criadas via FK em /api/videos antes do
+ * primeiro login). Esse token é o que prova, nas próximas requisições, que quem está chamando
+ * a API realmente é dono daquele userId — sem ele, qualquer cliente podia mandar um userId
+ * alheio (visível no localStorage/rede) e mexer na conta de outra pessoa. */
+async function ensureSessionToken(userRow: any): Promise<any> {
+  if (userRow.session_token) return userRow;
+  const token = crypto.randomUUID();
+  const { data: updated, error } = await supabaseAdmin
+    .from('app_users')
+    .update({ session_token: token })
+    .eq('id', userRow.id)
+    .select()
+    .single();
+  if (error) throw error;
+  return updated;
+}
+
+interface AuthedRequest extends express.Request {
+  authenticatedUserId?: string;
+  authenticatedUserEmail?: string;
+}
+
+/** Resolve o dono real da requisição a partir do header x-session-token, em vez de confiar no
+ * userId que o corpo da requisição alega ser. Aplicado só nas rotas que agem "em nome de" um
+ * usuário (deduzir crédito, salvar vídeo/livro, criar preferência de pagamento). */
+async function requireOwnership(req: AuthedRequest, res: express.Response, next: express.NextFunction) {
+  const token = req.header('x-session-token');
+  if (!token) {
+    return res.status(401).json({ error: 'Sessão ausente. Faça login novamente.' });
+  }
+  const { data: user, error } = await supabaseAdmin
+    .from('app_users')
+    .select('id, email')
+    .eq('session_token', token)
+    .maybeSingle();
+  if (error) {
+    console.error('Erro ao validar sessão:', error);
+    return res.status(500).json({ error: 'Falha ao validar sessão' });
+  }
+  if (!user) {
+    return res.status(401).json({ error: 'Sessão inválida ou expirada. Faça login novamente.' });
+  }
+  req.authenticatedUserId = user.id;
+  req.authenticatedUserEmail = user.email;
+  next();
 }
 
 // Login simples por e-mail: não usa senha (não temos essa infraestrutura ainda),
 // só busca a conta real pelo e-mail. Se não existir, cria uma conta SEM créditos —
 // diferente do comportamento antigo que dava 3 créditos grátis para qualquer e-mail digitado.
-app.post('/api/users/login', async (req, res) => {
+app.post('/api/users/login', accountLimiter, async (req, res) => {
   try {
     const { email, name } = req.body;
     if (!email) return res.status(400).json({ error: 'E-mail é obrigatório' });
@@ -145,7 +286,8 @@ app.post('/api/users/login', async (req, res) => {
     if (findError) throw findError;
 
     if (existing) {
-      return res.json({ user: mapUserRow(existing) });
+      const withToken = await ensureSessionToken(existing);
+      return res.json({ user: mapUserRow(withToken) });
     }
 
     const newUser = {
@@ -155,6 +297,7 @@ app.post('/api/users/login', async (req, res) => {
       credits: 0,
       is_paid_member: false,
       plan_name: null,
+      session_token: crypto.randomUUID(),
     };
     const { data: created, error: insertError } = await supabaseAdmin
       .from('app_users')
@@ -170,14 +313,184 @@ app.post('/api/users/login', async (req, res) => {
   }
 });
 
-/** Cria a conta (se não existir) e soma créditos comprados. Usado pelo checkout simulado e pelo webhook da Payt. */
-async function grantCreditsToUserByEmail(params: {
-  email: string;
-  name?: string;
-  packageId?: string;
-  credits: number;
-  amountBRL?: number;
-}) {
+// Cria a preferência de pagamento (Checkout Pro) para um pacote de créditos e devolve a URL de
+// redirecionamento — o cliente é enviado para o checkout hospedado pela Mercado Pago (que já
+// resolve PIX/boleto/cartão), nunca digita dados de pagamento dentro deste app. Créditos só são
+// liberados de fato quando o webhook (abaixo) confirma o pagamento aprovado — esta rota nunca
+// concede crédito nenhum, só inicia a cobrança.
+app.post('/api/checkout/create-preference', accountLimiter, requireOwnership, async (req: AuthedRequest, res) => {
+  try {
+    if (!isMercadoPagoConfigured()) {
+      return res.status(503).json({ error: 'Pagamentos ainda não configurados neste servidor.' });
+    }
+
+    const { packageId } = req.body;
+    const pkg = getCreditPackageById(String(packageId || ''));
+    if (!pkg) {
+      return res.status(400).json({ error: 'Pacote de créditos inválido.' });
+    }
+
+    const appUrl = (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+
+    const preference = await mpPreferenceClient.create({
+      body: {
+        items: [
+          {
+            id: pkg.id,
+            title: pkg.description || `${pkg.credits} crédito(s) — Memórias de Quem Eu Amo`,
+            quantity: 1,
+            unit_price: pkg.priceBRL,
+            currency_id: 'BRL',
+          },
+        ],
+        payer: { email: req.authenticatedUserEmail },
+        // userId::packageId — o webhook usa isso pra saber quem creditar e quanto, sem depender
+        // de metadata (a API da Mercado Pago costuma normalizar as chaves de metadata) nem de
+        // confiar em valor algum vindo do corpo da notificação.
+        external_reference: `${req.authenticatedUserId}::${pkg.id}`,
+        notification_url: `${appUrl}/api/webhook/mercadopago`,
+        back_urls: {
+          success: `${appUrl}/?payment=success`,
+          pending: `${appUrl}/?payment=pending`,
+          failure: `${appUrl}/?payment=failure`,
+        },
+        auto_return: 'approved',
+      },
+    });
+
+    const initPoint = preference.init_point || preference.sandbox_init_point;
+    if (!initPoint) throw new Error('Mercado Pago não retornou um link de checkout.');
+
+    res.json({ initPoint });
+  } catch (error: any) {
+    console.error('Erro ao criar preferência de pagamento:', error);
+    res.status(500).json({ error: 'Falha ao iniciar o pagamento', details: error.message });
+  }
+});
+
+// Webhook da Mercado Pago — única rota que efetivamente concede créditos. Verifica a assinatura
+// HMAC (x-signature) usando o secret configurado em "Suas integrações" > Webhooks no painel da
+// Mercado Pago antes de confiar em qualquer dado do payload, e é idempotente (não credita duas
+// vezes o mesmo pagamento em caso de reenvio).
+app.post('/api/webhook/mercadopago', webhookLimiter, async (req, res) => {
+  try {
+    if (!isMercadoPagoWebhookConfigured()) {
+      console.error('Webhook Mercado Pago recebido, mas MERCADOPAGO_WEBHOOK_SECRET não está configurado — recusando.');
+      return res.status(503).json({ error: 'Webhook não configurado' });
+    }
+
+    try {
+      WebhookSignatureValidator.validate({
+        xSignature: req.header('x-signature'),
+        xRequestId: req.header('x-request-id'),
+        dataId: req.query['data.id'] as string | undefined,
+        secret: getMercadoPagoWebhookSecret(),
+        toleranceSeconds: 300,
+      });
+    } catch (sigError: any) {
+      const reason = sigError instanceof InvalidWebhookSignatureError ? sigError.reason : 'unknown';
+      console.error(`Webhook Mercado Pago rejeitado — assinatura inválida (motivo: ${reason}).`);
+      return res.status(401).json({ error: 'Assinatura inválida' });
+    }
+
+    // Responde 200 logo após validar a assinatura, para a Mercado Pago não ficar retentando —
+    // o processamento em si (buscar o pagamento, creditar) continua depois em segundo plano.
+    res.json({ received: true });
+
+    const paymentId = req.body?.data?.id || (req.query['data.id'] as string | undefined);
+    if (!paymentId) {
+      console.error('Webhook Mercado Pago: notificação sem data.id, ignorando.');
+      return;
+    }
+
+    const payment = await mpPaymentClient.get({ id: paymentId });
+    const externalReference = payment.external_reference || '';
+    const [userId, packageId] = externalReference.split('::');
+    if (!userId || !packageId) {
+      console.error(`Webhook Mercado Pago: external_reference inesperado ("${externalReference}") no pagamento ${paymentId}.`);
+      return;
+    }
+
+    // Idempotência: se este pagamento já foi processado (reenvio de notificação), não credita de novo.
+    const { data: existingPayment } = await supabaseAdmin
+      .from('payments')
+      .select('id, status')
+      .eq('external_id', String(paymentId))
+      .maybeSingle();
+
+    if (payment.status === 'approved') {
+      if (existingPayment) {
+        console.log(`Webhook Mercado Pago: pagamento ${paymentId} já processado, ignorando reenvio.`);
+        return;
+      }
+      const pkg = getCreditPackageById(packageId);
+      if (!pkg) {
+        console.error(`Webhook Mercado Pago: packageId desconhecido ("${packageId}") no pagamento ${paymentId}.`);
+        return;
+      }
+
+      const { data: user, error: findError } = await supabaseAdmin
+        .from('app_users')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+      if (findError) throw findError;
+      if (!user) {
+        console.error(`Webhook Mercado Pago: usuário ${userId} não encontrado para o pagamento ${paymentId}.`);
+        return;
+      }
+
+      const { error: updateError } = await supabaseAdmin
+        .from('app_users')
+        .update({
+          credits: user.credits + pkg.credits,
+          is_paid_member: true,
+          plan_name: pkg.id,
+        })
+        .eq('id', userId);
+      if (updateError) throw updateError;
+
+      await supabaseAdmin.from('payments').insert({
+        id: `tx_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        user_id: userId,
+        package_id: pkg.id,
+        amount_brl: payment.transaction_amount || pkg.priceBRL,
+        credits_added: pkg.credits,
+        status: 'completed',
+        external_id: String(paymentId),
+        gateway: 'mercadopago',
+      });
+      console.log(`✅ ${pkg.credits} crédito(s) liberado(s) via Mercado Pago para o usuário ${userId} (pagamento ${paymentId}).`);
+      return;
+    }
+
+    if (['refunded', 'charged_back', 'cancelled'].includes(String(payment.status))) {
+      // Só desfaz se este pagamento específico já tinha sido creditado antes — nunca zera a
+      // conta inteira (o usuário pode ter créditos de outras compras).
+      if (existingPayment && existingPayment.status === 'completed') {
+        const pkg = getCreditPackageById(packageId);
+        if (pkg) {
+          const { data: user } = await supabaseAdmin.from('app_users').select('credits').eq('id', userId).maybeSingle();
+          if (user) {
+            await supabaseAdmin
+              .from('app_users')
+              .update({ credits: Math.max(0, user.credits - pkg.credits) })
+              .eq('id', userId);
+          }
+        }
+        await supabaseAdmin.from('payments').update({ status: String(payment.status) }).eq('id', existingPayment.id);
+        console.log(`🚫 Créditos do pagamento ${paymentId} revertidos (status: ${payment.status}).`);
+      }
+    }
+  } catch (error: any) {
+    console.error('Erro ao processar webhook Mercado Pago:', error);
+  }
+});
+
+/** Concede o acesso inicial (vira membro pago) a partir de uma compra confirmada pela Payt —
+ * usado só pela primeira compra (feita fora do app, numa página de vendas própria). Compras
+ * adicionais de créditos acontecem pela Mercado Pago (ver /api/webhook/mercadopago acima). */
+async function grantInitialAccessByEmail(params: { email: string; name?: string; credits: number; packageId: string; amountBRL?: number; externalId?: string }) {
   const normalizedEmail = String(params.email).trim().toLowerCase();
 
   const { data: existing, error: findError } = await supabaseAdmin
@@ -194,7 +507,7 @@ async function grantCreditsToUserByEmail(params: {
       .update({
         credits: existing.credits + params.credits,
         is_paid_member: true,
-        plan_name: params.packageId || existing.plan_name,
+        plan_name: params.packageId,
         name: params.name || existing.name,
       })
       .eq('id', existing.id)
@@ -211,7 +524,8 @@ async function grantCreditsToUserByEmail(params: {
         email: normalizedEmail,
         credits: params.credits,
         is_paid_member: true,
-        plan_name: params.packageId || null,
+        plan_name: params.packageId,
+        session_token: crypto.randomUUID(),
       })
       .select()
       .single();
@@ -222,22 +536,25 @@ async function grantCreditsToUserByEmail(params: {
   await supabaseAdmin.from('payments').insert({
     id: `tx_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     user_id: userRow.id,
-    package_id: params.packageId || null,
+    package_id: params.packageId,
     amount_brl: params.amountBRL || null,
     credits_added: params.credits,
     status: 'completed',
+    external_id: params.externalId || null,
+    gateway: 'payt',
   });
 
   return userRow;
 }
 
-/**
- * Bloqueia o acesso de um usuário quando a compra é cancelada/estornada/chargeback —
- * zera os créditos (não pode mais criar vídeos novos) e derruba o status de membro pago
- * (não entra mais na área de membros). Vídeos já criados continuam existindo/acessíveis
- * pelo link do cartão, só a criação de novos fica bloqueada.
- */
-async function revokeAccessByEmail(email: string, reason: string) {
+/** Bloqueia o acesso quando a Payt notifica cancelamento/chargeback/reembolso da compra
+ * inicial — zera os créditos e derruba o status de membro pago. Diferente da Mercado Pago, aqui
+ * não dá pra reverter só o valor de um pagamento específico com segurança (não confiamos ainda
+ * em nenhum id de transação da Payt pra correlacionar), então zera a conta inteira — aceitável
+ * porque hoje a Payt é usada só pra compra inicial (não há créditos de outras origens somados
+ * quando isso acontece, exceto se a pessoa já comprou créditos extra pela Mercado Pago depois —
+ * risco documentado, ajustar se isso passar a acontecer na prática). */
+async function revokeInitialAccessByEmail(email: string, reason: string) {
   const normalizedEmail = String(email).trim().toLowerCase();
 
   const { data: existing, error: findError } = await supabaseAdmin
@@ -266,36 +583,31 @@ async function revokeAccessByEmail(email: string, reason: string) {
     amount_brl: null,
     credits_added: 0,
     status: reason,
+    gateway: 'payt',
   });
 
   return updated;
 }
 
-// Registra uma compra de créditos (checkout simulado por enquanto — será substituído
-// pelo webhook real da Payt). Cria a conta se não existir e soma os créditos comprados.
-app.post('/api/users/checkout', async (req, res) => {
-  try {
-    const { email, name, packageId, credits, amountBRL } = req.body;
-    if (!email || !credits) {
-      return res.status(400).json({ error: 'email e credits são obrigatórios' });
-    }
-    const userRow = await grantCreditsToUserByEmail({ email, name, packageId, credits, amountBRL });
-    res.json({ user: mapUserRow(userRow) });
-  } catch (error: any) {
-    console.error('Erro no checkout:', error);
-    res.status(500).json({ error: 'Falha ao processar a compra', details: error.message });
+// Webhook (postback) da Payt — usado só pra compra inicial (virar membro pago), feita numa
+// página de vendas fora deste app. Autenticado por um token secreto na própria URL (configurado
+// no painel da Payt), já que a Payt não documenta um esquema de assinatura HMAC como a Mercado
+// Pago. FORMATO AINDA NÃO CONFIRMADO: registra o payload bruto no log pra descobrirmos o formato
+// real assim que o primeiro evento de teste chegar (ver src/lib/paytCatalog.ts).
+app.post('/api/webhook/payt/:token', webhookLimiter, async (req, res) => {
+  if (!isPaytWebhookConfigured()) {
+    console.error('Webhook Payt recebido, mas PAYT_WEBHOOK_SECRET não está configurado — recusando.');
+    return res.status(503).json({ error: 'Webhook não configurado' });
   }
-});
+  if (req.params.token !== getPaytWebhookSecret()) {
+    console.error('Webhook Payt rejeitado — token da URL não confere.');
+    return res.status(401).json({ error: 'Token inválido' });
+  }
 
-// Webhook (postback) da Payt — recebe a notificação de pagamento aprovado (libera créditos)
-// ou de cancelamento/chargeback/reembolso (bloqueia o acesso e zera os créditos).
-// FORMATO AINDA NÃO CONFIRMADO: por enquanto registra o payload bruto no log do servidor para
-// descobrirmos o formato real assim que a Payt enviar o primeiro evento de teste.
-app.post('/api/webhook/payt', async (req, res) => {
   console.log('📩 Webhook Payt recebido:', JSON.stringify(req.body));
   try {
-    // Responde 200 sempre que possível para a Payt não ficar retentando, mesmo que
-    // ainda não saibamos processar todos os formatos de evento.
+    // Responde 200 logo após validar o token, pra Payt não ficar retentando, mesmo que ainda
+    // não saibamos processar todos os formatos de evento.
     res.json({ received: true });
 
     const payload = req.body || {};
@@ -313,7 +625,7 @@ app.post('/api/webhook/payt', async (req, res) => {
     const isRevoked = /reembols|chargeback|estorn|refund|dispute/.test(eventStatus);
 
     if (isRevoked) {
-      await revokeAccessByEmail(email, eventStatus || 'refunded');
+      await revokeInitialAccessByEmail(email, eventStatus || 'refunded');
       console.log(`🚫 Acesso bloqueado via webhook Payt (evento "${eventStatus}") para ${email}`);
       return;
     }
@@ -324,15 +636,20 @@ app.post('/api/webhook/payt', async (req, res) => {
     }
 
     const name = payload.name || payload.customer?.name || payload.buyer?.name;
-    const packageId = payload.productId || payload.offerId || payload.product?.id;
+    const productId = String(payload.productId || payload.offerId || payload.product?.id || '');
     const amountBRL = payload.amount || payload.total || payload.price;
+    const externalId = payload.id || payload.transactionId || payload.orderId || payload.saleId
+      ? `payt:${payload.id || payload.transactionId || payload.orderId || payload.saleId}`
+      : undefined;
 
-    // TODO: mapear productId/offerId da Payt para a quantidade de créditos do pacote
-    // correspondente (hoje fixo em 1, ajustar assim que soubermos os IDs reais dos produtos).
-    const credits = 1;
+    const product = getPaytProductById(productId);
+    if (!product) {
+      console.error(`Webhook Payt: productId desconhecido ("${productId}") — nenhum crédito liberado. Atualize src/lib/paytCatalog.ts com o ID real.`);
+      return;
+    }
 
-    await grantCreditsToUserByEmail({ email, name, packageId, credits, amountBRL });
-    console.log(`✅ Créditos liberados via webhook Payt para ${email}`);
+    await grantInitialAccessByEmail({ email, name, credits: product.credits, packageId: product.packageId, amountBRL, externalId });
+    console.log(`✅ ${product.credits} crédito(s) liberado(s) via webhook Payt para ${email}`);
   } catch (error: any) {
     console.error('Erro ao processar webhook Payt:', error);
   }
@@ -340,10 +657,11 @@ app.post('/api/webhook/payt', async (req, res) => {
 
 // Deduz 1 crédito do usuário de forma atômica no servidor — a liberação de HD não pode
 // confiar só no localStorage, senão o mesmo crédito poderia ser "reusado" em outro dispositivo.
-app.post('/api/users/deduct-credit', async (req, res) => {
+// Age sempre sobre o usuário autenticado pelo session_token, nunca sobre o userId do corpo —
+// senão qualquer cliente podia deduzir crédito da conta de outra pessoa só sabendo o id dela.
+app.post('/api/users/deduct-credit', requireOwnership, async (req: AuthedRequest, res) => {
   try {
-    const { userId } = req.body;
-    if (!userId) return res.status(400).json({ error: 'userId é obrigatório' });
+    const userId = req.authenticatedUserId!;
 
     const { data: user, error: findError } = await supabaseAdmin
       .from('app_users')
@@ -371,28 +689,27 @@ app.post('/api/users/deduct-credit', async (req, res) => {
   }
 });
 
+const MAX_PHOTOS_PER_JOB = 30;
+const MAX_AI_IMAGES_PER_JOB = 30;
+const MAX_BOOK_PAGES = 40;
+
 // Salva (cria ou atualiza) um vídeo de homenagem no banco central — é isso que faz o
 // cartão digital /c/{id} funcionar em qualquer dispositivo, não só no navegador de quem criou.
-app.post('/api/videos', async (req, res) => {
+// O dono do vídeo é sempre o usuário autenticado pelo session_token (nunca job.userId do corpo),
+// senão qualquer cliente podia sobrescrever o vídeo de outra pessoa só sabendo o id do job.
+app.post('/api/videos', requireOwnership, async (req: AuthedRequest, res) => {
   try {
     const job = req.body;
-    if (!job || !job.id || !job.userId) {
-      return res.status(400).json({ error: 'Vídeo inválido: id e userId são obrigatórios' });
+    if (!job || !job.id) {
+      return res.status(400).json({ error: 'Vídeo inválido: id é obrigatório' });
     }
-
-    // Garante que o usuário existe (FK) sem sobrescrever créditos/dados já existentes
-    const { data: existingUser } = await supabaseAdmin
-      .from('app_users')
-      .select('id')
-      .eq('id', job.userId)
-      .maybeSingle();
-    if (!existingUser) {
-      await supabaseAdmin.from('app_users').insert({ id: job.userId, name: job.authorName || null });
+    if ((job.photos?.length || 0) > MAX_PHOTOS_PER_JOB || (job.aiGeneratedImages?.length || 0) > MAX_AI_IMAGES_PER_JOB) {
+      return res.status(400).json({ error: 'Número de fotos/imagens excede o limite permitido.' });
     }
 
     const row = {
       id: job.id,
-      user_id: job.userId,
+      user_id: req.authenticatedUserId,
       title: job.title,
       father_name: job.fatherName,
       photos: job.photos || [],
@@ -475,26 +792,21 @@ app.get('/api/videos/:id', async (req, res) => {
 });
 
 // Salva (cria ou atualiza) um Livro de Memórias no projeto Supabase separado deste recurso.
-app.post('/api/memory-books', async (req, res) => {
+// Mesma regra de ownership do /api/videos: o dono é sempre o usuário autenticado pelo
+// session_token, nunca book.userId do corpo.
+app.post('/api/memory-books', requireOwnership, async (req: AuthedRequest, res) => {
   try {
     const book = req.body;
-    if (!book || !book.id || !book.userId) {
-      return res.status(400).json({ error: 'Livro inválido: id e userId são obrigatórios' });
+    if (!book || !book.id) {
+      return res.status(400).json({ error: 'Livro inválido: id é obrigatório' });
     }
-
-    // Garante que o usuário existe (FK) sem sobrescrever créditos/dados já existentes
-    const { data: existingUser } = await supabaseAdmin
-      .from('app_users')
-      .select('id')
-      .eq('id', book.userId)
-      .maybeSingle();
-    if (!existingUser) {
-      await supabaseAdmin.from('app_users').insert({ id: book.userId, name: null });
+    if ((book.photos?.length || 0) > MAX_PHOTOS_PER_JOB || (book.pages?.length || 0) > MAX_BOOK_PAGES) {
+      return res.status(400).json({ error: 'Número de fotos/páginas excede o limite permitido.' });
     }
 
     const row = {
       id: book.id,
-      user_id: book.userId,
+      user_id: req.authenticatedUserId,
       father_name: book.fatherName,
       photos: book.photos || [],
       pages: book.pages || [],
@@ -562,7 +874,7 @@ app.get('/api/memory-books/:id', async (req, res) => {
 });
 
 // 1. Generate Emotional Tribute Text using Gemini AI
-app.post('/api/generate-text', async (req, res) => {
+app.post('/api/generate-text', aiGenerationLimiter, async (req, res) => {
   try {
     const { fatherName, specialMemory, adjective, authorName, tone } = req.body;
 
@@ -602,7 +914,7 @@ DIRETRIZES DE ESTILO E CRIATIVIDADE (MUITO IMPORTANTE):
 });
 
 // 2. Extract visual prompts for illustrative scenes
-app.post('/api/extract-visual-themes', async (req, res) => {
+app.post('/api/extract-visual-themes', aiGenerationLimiter, async (req, res) => {
   try {
     const { text, fatherName, count, memoryAge, narratorGender } = req.body;
     if (!text) {
@@ -695,7 +1007,7 @@ Colors: black and white with subtle warm sepia undertones.`,
 };
 
 // 3. Generate AI Illustration Image using OpenAI (gpt-image-1)
-app.post('/api/generate-ai-image', async (req, res) => {
+app.post('/api/generate-ai-image', expensiveAiLimiter, async (req, res) => {
   try {
     const { prompt, titlePt, style } = req.body;
     if (!prompt) {
@@ -753,7 +1065,7 @@ Scene theme: ${prompt}`;
 // Supabase Storage num caminho fixo e reusamos pra sempre depois da primeira geração.
 const CARD_BACKGROUND_STORAGE_PATH = 'branding/card-background.png';
 
-app.post('/api/generate-card-background', async (req, res) => {
+app.post('/api/generate-card-background', expensiveAiLimiter, async (req, res) => {
   try {
     const { data: publicUrlData } = supabaseAdmin.storage.from(MEDIA_BUCKET).getPublicUrl(CARD_BACKGROUND_STORAGE_PATH);
     const existingCheck = await fetch(publicUrlData.publicUrl, { method: 'HEAD' });
@@ -803,7 +1115,7 @@ Mood: celebratory, warm, loving, elegant.`;
 
 
 // 4. Generate TTS Narration using ElevenLabs (multilingual v2)
-app.post('/api/generate-narration-tts', async (req, res) => {
+app.post('/api/generate-narration-tts', aiGenerationLimiter, async (req, res) => {
   try {
     const { text, voiceId } = req.body;
     if (!text) {
@@ -853,7 +1165,7 @@ app.post('/api/generate-narration-tts', async (req, res) => {
 });
 
 // 5. Clone voice via ElevenLabs Instant Voice Cloning + synthesize tribute text
-app.post('/api/clone-voice', async (req, res) => {
+app.post('/api/clone-voice', expensiveAiLimiter, async (req, res) => {
   try {
     const { audioDataUrl, tributeText, voiceName } = req.body;
     if (!audioDataUrl || !tributeText) {
@@ -940,7 +1252,7 @@ app.post('/api/clone-voice', async (req, res) => {
 // (poll até "unlockedVideoUrl" aparecer). Isso evita manter uma conexão HTTP aberta por
 // minutos quando há fila (ver RenderQueue acima), o que arriscaria timeout no proxy em
 // picos de tráfego.
-app.post('/api/render-video', async (req, res) => {
+app.post('/api/render-video', renderLimiter, async (req, res) => {
   const { videoId, fatherName, photos, aiImages, useAIImages, tributeText, narrationAudioDataUrl, selectedTrackId, captionStyle } = req.body;
 
   // No modo "só IA" o vídeo não tem nenhuma foto real — o conteúdo visual inteiro vem de
@@ -949,6 +1261,9 @@ app.post('/api/render-video', async (req, res) => {
   const hasAnyImage = (photos && photos.length > 0) || (useAIImages && aiImages && aiImages.length > 0);
   if (!hasAnyImage) {
     return res.status(400).json({ error: 'É necessário ao menos uma foto ou imagem de IA para renderizar o vídeo.' });
+  }
+  if ((photos?.length || 0) > MAX_PHOTOS_PER_JOB || (aiImages?.length || 0) > MAX_AI_IMAGES_PER_JOB) {
+    return res.status(400).json({ error: 'Número de fotos/imagens excede o limite permitido.' });
   }
 
   const finalVideoId = videoId || `vid_${Date.now()}`;
@@ -999,11 +1314,14 @@ app.post('/api/render-video', async (req, res) => {
 
 // Mesmo padrão assíncrono de fila + polling de /api/render-video, mas para o Livro de Memórias:
 // cada página já chega pronta (PNG composto no navegador) e vira um slide com zoom/transição.
-app.post('/api/render-book-video', async (req, res) => {
+app.post('/api/render-book-video', renderLimiter, async (req, res) => {
   const { bookId, pageImageUrls, narrationAudioDataUrl, selectedTrackId } = req.body;
 
   if (!pageImageUrls || pageImageUrls.length === 0) {
     return res.status(400).json({ error: 'É necessário ao menos uma página para renderizar o vídeo do livro.' });
+  }
+  if (pageImageUrls.length > MAX_BOOK_PAGES) {
+    return res.status(400).json({ error: 'Número de páginas excede o limite permitido.' });
   }
 
   const finalBookId = bookId || `book_${Date.now()}`;

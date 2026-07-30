@@ -71,7 +71,7 @@ export const CreateMemoryBookWizard: React.FC<CreateMemoryBookWizardProps> = ({
 
     let updatedUser: User;
     try {
-      updatedUser = await deductCreditRemote(user.id);
+      updatedUser = await deductCreditRemote(user.id, user.sessionToken || '');
     } catch (e: any) {
       alert(e.message || 'Não foi possível criar o livro agora. Tente novamente.');
       setIsGeneratingJob(false);
@@ -126,7 +126,7 @@ export const CreateMemoryBookWizard: React.FC<CreateMemoryBookWizardProps> = ({
       try {
         const bookWithRemoteMedia = await uploadMemoryBookMedia(newBook);
         saveMemoryBookJob(bookWithRemoteMedia);
-        await saveMemoryBookRemote(bookWithRemoteMedia);
+        await saveMemoryBookRemote(bookWithRemoteMedia, user.sessionToken || '');
         setCreatedBook(bookWithRemoteMedia);
       } catch (e: any) {
         console.error('Erro ao sincronizar livro com o servidor:', e);

@@ -6,6 +6,9 @@ export interface User {
   isPaidMember: boolean;
   planName?: string;
   createdAt: string;
+  // Prova de que este navegador é dono da conta — enviado no header x-session-token em toda
+  // chamada que age "em nome do usuário" (deduzir crédito, salvar vídeo/livro, checkout).
+  sessionToken?: string;
 }
 
 export interface MediaAsset {

@@ -52,11 +52,12 @@ export async function uploadVideoJobMedia(video: VideoJob): Promise<VideoJob> {
   };
 }
 
-/** Salva (cria ou atualiza) o vídeo no banco central, para o cartão digital funcionar em qualquer dispositivo. */
-export async function saveVideoJobRemote(video: VideoJob): Promise<void> {
+/** Salva (cria ou atualiza) o vídeo no banco central, para o cartão digital funcionar em qualquer
+ * dispositivo. O servidor identifica o dono pelo sessionToken (nunca por video.userId). */
+export async function saveVideoJobRemote(video: VideoJob, sessionToken: string): Promise<void> {
   const response = await fetch('/api/videos', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'x-session-token': sessionToken },
     body: JSON.stringify(video),
   });
   if (!response.ok) {

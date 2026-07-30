@@ -71,7 +71,7 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
     // já que não existe mais etapa de desbloqueio (a pessoa já está numa área paga).
     let updatedUser: User;
     try {
-      updatedUser = await deductCreditRemote(user.id);
+      updatedUser = await deductCreditRemote(user.id, user.sessionToken || '');
     } catch (e: any) {
       alert(e.message || 'Não foi possível criar o vídeo agora. Tente novamente.');
       setIsGeneratingJob(false);
@@ -124,7 +124,7 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
     try {
       const jobWithRemoteMedia = await uploadVideoJobMedia(newJob);
       saveVideoJob(jobWithRemoteMedia);
-      await saveVideoJobRemote(jobWithRemoteMedia);
+      await saveVideoJobRemote(jobWithRemoteMedia, user.sessionToken || '');
       setCreatedJob(jobWithRemoteMedia);
     } catch (e: any) {
       console.error('Erro ao sincronizar vídeo com o servidor:', e);
@@ -265,7 +265,7 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
               editableCaptionStyle
               onCaptionStyleChange={(style: CaptionStyle) => {
                 setCreatedJob((prev) => (prev ? { ...prev, captionStyle: style } : prev));
-                saveVideoJobRemote({ ...createdJob, captionStyle: style }).catch((err) =>
+                saveVideoJobRemote({ ...createdJob, captionStyle: style }, user.sessionToken || '').catch((err) =>
                   console.warn('Falha ao salvar estilo de legenda no servidor:', err)
                 );
               }}

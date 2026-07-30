@@ -19,8 +19,7 @@ import {
 } from 'lucide-react';
 import { User, VideoJob, MemoryBookJob, CreditPackage } from '../types';
 import { CREDIT_PACKAGES } from '../data/presets';
-import { saveStoredUser } from '../lib/credits';
-import { checkoutCredits } from '../lib/authApi';
+import { createCheckoutPreference } from '../lib/paymentApi';
 import { MembersMediaManager } from './MembersMediaManager';
 
 interface DashboardProps {
@@ -47,28 +46,22 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [selectedPkg, setSelectedPkg] = useState<CreditPackage>(CREDIT_PACKAGES[1] || CREDIT_PACKAGES[0]);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [buyError, setBuyError] = useState('');
 
-  const handleSimulateAddCredits = async () => {
+  // Manda pro checkout hospedado pela Mercado Pago — os créditos só entram na conta quando o
+  // pagamento é confirmado via webhook (ver server.ts), nunca diretamente por esta tela.
+  const handleBuyCredits = async () => {
     setIsProcessingPayment(true);
+    setBuyError('');
     try {
-      const updatedUser = await checkoutCredits({
-        email: user.email,
-        name: user.name,
+      const { initPoint } = await createCheckoutPreference({
         packageId: selectedPkg.id,
-        credits: selectedPkg.credits,
-        amountBRL: selectedPkg.priceBRL,
+        sessionToken: user.sessionToken || '',
       });
-      saveStoredUser(updatedUser);
-      setUser(updatedUser);
-      setPaymentSuccess(true);
-      setTimeout(() => {
-        setPaymentSuccess(false);
-        setShowBuyModal(false);
-      }, 1200);
-    } catch (e) {
-      console.error('Erro ao adicionar créditos:', e);
-    } finally {
+      window.location.href = initPoint;
+    } catch (e: any) {
+      console.error('Erro ao iniciar pagamento:', e);
+      setBuyError(e.message || 'Não foi possível iniciar o pagamento. Tente novamente.');
       setIsProcessingPayment(false);
     }
   };
@@ -440,19 +433,23 @@ export const Dashboard: React.FC<DashboardProps> = ({
               ))}
             </div>
 
-            {paymentSuccess ? (
-              <div className="p-3 bg-emerald-500/20 text-emerald-300 rounded-xl border border-emerald-500/30 text-center font-bold text-xs flex items-center justify-center gap-2">
-                <CheckCircle2 className="w-4 h-4" /> Créditos Adicionados!
+            {buyError && (
+              <div className="p-3 bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs rounded-xl font-semibold">
+                {buyError}
               </div>
-            ) : (
-              <button
-                onClick={handleSimulateAddCredits}
-                disabled={isProcessingPayment}
-                className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-bold text-sm rounded-xl transition-all flex items-center justify-center gap-2"
-              >
-                {isProcessingPayment ? 'Adicionando...' : `Adicionar ${selectedPkg.credits} Crédito(s)`}
-              </button>
             )}
+
+            <button
+              onClick={handleBuyCredits}
+              disabled={isProcessingPayment}
+              className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-bold text-sm rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+            >
+              {isProcessingPayment ? 'Redirecionando...' : `Pagar ${selectedPkg.priceFormatted} com Mercado Pago`}
+            </button>
+
+            <p className="text-[11px] text-slate-500 text-center">
+              Você será redirecionado para o checkout seguro da Mercado Pago (PIX, boleto ou cartão).
+            </p>
           </div>
         </div>
       )}

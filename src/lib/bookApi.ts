@@ -33,11 +33,12 @@ export async function uploadMemoryBookMedia(book: MemoryBookJob): Promise<Memory
   };
 }
 
-/** Salva (cria ou atualiza) o livro no banco, para o cartão digital público funcionar em qualquer dispositivo. */
-export async function saveMemoryBookRemote(book: MemoryBookJob): Promise<void> {
+/** Salva (cria ou atualiza) o livro no banco, para o cartão digital público funcionar em qualquer
+ * dispositivo. O servidor identifica o dono pelo sessionToken (nunca por book.userId). */
+export async function saveMemoryBookRemote(book: MemoryBookJob, sessionToken: string): Promise<void> {
   const response = await fetch('/api/memory-books', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'x-session-token': sessionToken },
     body: JSON.stringify(book),
   });
   if (!response.ok) {

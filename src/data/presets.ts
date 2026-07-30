@@ -250,3 +250,8 @@ export const CREDIT_PACKAGES: CreditPackage[] = [
     description: '5 Vídeos HD (Apenas R$ 10,98 por vídeo) — Ideal para dar aos pais, avôs e tios',
   },
 ];
+
+// Raiz do domínio — vai hospedar a página de vendas (fora deste projeto). O app em si roda em
+// app.memoriasdequemeuamo.com.br (domínio próprio, configurado à parte na Railway) pra não
+// conflitar com a página de vendas na raiz.
+export const SALES_PAGE_URL = 'https://memoriasdequemeuamo.com.br/';

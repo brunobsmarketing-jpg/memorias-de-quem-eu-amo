@@ -8,8 +8,15 @@ create table if not exists app_users (
   credits integer not null default 0,
   is_paid_member boolean not null default false,
   plan_name text,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- Prova de que quem está chamando a API é dono desse userId (ver requireOwnership em
+  -- server.ts) — sem isso, qualquer cliente podia mandar um userId alheio e mexer na conta
+  -- de outra pessoa (deduzir crédito, sobrescrever vídeo/livro).
+  session_token text unique
 );
+
+-- Rode esta linha também se app_users já existia antes desta coluna ser criada:
+alter table app_users add column if not exists session_token text unique;
 
 create table if not exists video_jobs (
   id text primary key,
@@ -41,8 +48,18 @@ create table if not exists payments (
   amount_brl numeric,
   credits_added integer,
   status text,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- id do pagamento na Mercado Pago (ou "payt:<id>" quando vier da Payt) — garante que o
+  -- webhook nunca credite duas vezes o mesmo pagamento em caso de reenvio de notificação.
+  external_id text,
+  -- de onde veio o pagamento: 'payt' (compra inicial, vira membro pago) ou 'mercadopago'
+  -- (créditos adicionais, comprados dentro do app já como membro).
+  gateway text
 );
+
+alter table payments add column if not exists external_id text;
+alter table payments add column if not exists gateway text;
+create unique index if not exists idx_payments_external_id on payments(external_id) where external_id is not null;
 
 create table if not exists media_assets (
   id text primary key,

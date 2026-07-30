@@ -18,6 +18,7 @@ import {
   getStoredBooks,
   saveMemoryBookJob,
   clearStoredUser,
+  saveStoredUser,
 } from './lib/credits';
 import { Dashboard } from './components/Dashboard';
 import { ChooseCreationType } from './components/ChooseCreationType';
@@ -30,6 +31,7 @@ import { VideoPlayer } from './components/VideoPlayer';
 import { PaywallCheckoutPage } from './components/PaywallCheckoutPage';
 import { fetchVideoJobRemote } from './lib/videoApi';
 import { fetchMemoryBookRemote } from './lib/bookApi';
+import { loginByEmail } from './lib/authApi';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(() => getStoredUser());
@@ -59,6 +61,41 @@ export default function App() {
   }, [theme]);
 
   const toggleTheme = () => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+
+  const [paymentBanner, setPaymentBanner] = useState<{ type: 'success' | 'pending' | 'failure'; message: string } | null>(null);
+
+  // Trata o retorno do checkout da Mercado Pago (back_urls em /api/checkout/create-preference).
+  // Os créditos já foram (ou serão) liberados via webhook no servidor — aqui só refletimos o
+  // resultado pro usuário e buscamos o saldo atualizado, já que o webhook pode levar alguns
+  // segundos a mais que o redirecionamento de volta pro navegador.
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const paymentStatus = searchParams.get('payment');
+    if (!paymentStatus) return;
+
+    // Limpa o parâmetro da URL pra não reprocessar/repetir o banner se a pessoa atualizar a página.
+    window.history.replaceState({}, '', window.location.pathname);
+
+    if (paymentStatus === 'success') {
+      setPaymentBanner({ type: 'success', message: 'Pagamento aprovado! Atualizando seus créditos…' });
+      const storedUser = getStoredUser();
+      if (storedUser?.email) {
+        loginByEmail(storedUser.email, storedUser.name)
+          .then((freshUser) => {
+            saveStoredUser(freshUser);
+            setUser(freshUser);
+            setPaymentBanner({ type: 'success', message: `Pagamento aprovado! ${freshUser.credits} crédito(s) na sua conta.` });
+          })
+          .catch(() => {
+            setPaymentBanner({ type: 'success', message: 'Pagamento aprovado! Se os créditos não aparecerem em instantes, atualize a página.' });
+          });
+      }
+    } else if (paymentStatus === 'pending') {
+      setPaymentBanner({ type: 'pending', message: 'Pagamento em análise (comum no PIX/boleto). Seus créditos são liberados assim que for confirmado.' });
+    } else if (paymentStatus === 'failure') {
+      setPaymentBanner({ type: 'failure', message: 'Pagamento não concluído. Você pode tentar novamente quando quiser.' });
+    }
+  }, []);
 
   // Check URL pathname or search params for public card link /c/{id}
   useEffect(() => {
@@ -315,6 +352,23 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 px-4 sm:px-6 py-8 max-w-7xl mx-auto w-full">
+        {paymentBanner && (
+          <div
+            className={`mb-6 p-4 rounded-2xl border text-sm font-semibold flex items-center justify-between gap-3 ${
+              paymentBanner.type === 'success'
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                : paymentBanner.type === 'pending'
+                ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+            }`}
+          >
+            <span>{paymentBanner.message}</span>
+            <button onClick={() => setPaymentBanner(null)} className="opacity-70 hover:opacity-100 font-bold">
+              ✕
+            </button>
+          </div>
+        )}
+
         {/* VIEW 1: PAYWALL CHECKOUT PAGE (if user is not paid member) */}
         {(!user || !user.isPaidMember) && (
           <PaywallCheckoutPage
