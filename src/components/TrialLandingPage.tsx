@@ -80,14 +80,14 @@ export const TrialLandingPage: React.FC<TrialLandingPageProps> = ({ onStart }) =
         <p className="text-slate-400 text-sm sm:text-base max-w-xl mx-auto leading-relaxed">
           A Memora transforma fotos esquecidas no seu celular numa homenagem em vídeo, com
           narração e trilha sonora — pronta em menos de 3 minutos. Assista o resultado completo
-          agora, de graça. Só paga se quiser levar sem marca d'água.
+          agora, de graça.
         </p>
 
         <button
           onClick={onStart}
           className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 hover:from-amber-400 hover:to-orange-400 text-black font-extrabold text-base rounded-2xl shadow-xl transition-all active:scale-98"
         >
-          Ver Meu Vídeo Pronto Agora <ArrowRight className="w-5 h-5" />
+          Criar um Vídeo Especial pro Meu Pai <ArrowRight className="w-5 h-5" />
         </button>
       </div>
 
@@ -128,7 +128,7 @@ export const TrialLandingPage: React.FC<TrialLandingPageProps> = ({ onStart }) =
           onClick={onStart}
           className="w-full py-4 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 hover:from-amber-400 hover:to-orange-400 text-black font-extrabold text-base rounded-2xl shadow-xl transition-all active:scale-98 flex items-center justify-center gap-2"
         >
-          Ver Meu Vídeo Pronto Agora <ArrowRight className="w-5 h-5" />
+          Criar um Vídeo Especial pro Meu Pai <ArrowRight className="w-5 h-5" />
         </button>
       </div>
     </div>
