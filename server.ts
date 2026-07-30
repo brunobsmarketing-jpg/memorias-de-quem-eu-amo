@@ -1340,6 +1340,16 @@ app.post('/api/render-video', renderLimiter, async (req, res) => {
 
     // Mantém o vídeo salvo no banco central atualizado com a URL definitiva do MP4 em HD
     await supabaseAdmin.from('video_jobs').update({ unlocked_video_url: durableMp4Url }).eq('id', finalVideoId);
+
+    // Uma vez que a cópia durável já está no Storage, o MP4 local em public/renders/ não serve
+    // mais pra nada (o disco da Railway é efêmero, então nem sobrevive a um redeploy) — apagar
+    // agora evita que ele fique acumulando e enchendo o disco num pico de criações.
+    try {
+      fs.unlinkSync(absoluteLocalPath);
+    } catch (cleanupErr) {
+      console.warn(`⚠️ Não foi possível apagar o MP4 local de ${finalVideoId}:`, cleanupErr);
+    }
+
     console.log(`✅ Renderização concluída e publicada para ${finalVideoId}`);
   } catch (error: any) {
     console.error(`❌ Erro na renderização FFmpeg de ${finalVideoId}:`, error);
@@ -1391,6 +1401,15 @@ app.post('/api/render-book-video', renderLimiter, async (req, res) => {
     const durableMp4Url = publicUrlData.publicUrl;
 
     await supabaseAdmin.from('memory_book_jobs').update({ unlocked_video_url: durableMp4Url }).eq('id', finalBookId);
+
+    // Mesma limpeza do /api/render-video: a cópia durável já está no Storage, então o MP4 local
+    // só ocuparia espaço à toa até o próximo redeploy apagar o disco efêmero de qualquer jeito.
+    try {
+      fs.unlinkSync(absoluteLocalPath);
+    } catch (cleanupErr) {
+      console.warn(`⚠️ Não foi possível apagar o MP4 local do livro ${finalBookId}:`, cleanupErr);
+    }
+
     console.log(`✅ Renderização do livro concluída e publicada para ${finalBookId}`);
   } catch (error: any) {
     console.error(`❌ Erro na renderização FFmpeg do livro ${finalBookId}:`, error);
