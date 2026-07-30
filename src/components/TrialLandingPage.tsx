@@ -1,5 +1,5 @@
 import React from 'react';
-import { Upload, Wand2, Mic, PlayCircle, CheckCircle2, ArrowRight, Sparkles, Clock } from 'lucide-react';
+import { Upload, Wand2, Mic, PlayCircle, CheckCircle2, ArrowRight, Sparkles, Clock, CalendarHeart } from 'lucide-react';
 
 interface TrialLandingPageProps {
   onStart: () => void;
@@ -13,8 +13,8 @@ const STEPS = [
   },
   {
     icon: Wand2,
-    title: 'Escreva ou gere o texto com IA',
-    description: 'Conte uma lembrança marcante, ou deixe a IA escrever um texto emocionante por você.',
+    title: 'Não sabe o que escrever? A IA cria o texto por você',
+    description: 'Conte uma lembrança marcante, ou deixe a IA escrever um texto emocionante do zero.',
   },
   {
     icon: Mic,
@@ -28,11 +28,23 @@ const STEPS = [
   },
 ];
 
+// Segundo domingo de agosto de 2026 — calculado uma vez só (não precisa ser reativo por segundo,
+// só não pode ficar hardcoded como texto fixo tipo "faltam 9 dias", que ficaria errado no dia
+// seguinte). Se a página ainda estiver no ar depois da data, o badge simplesmente some.
+const FATHERS_DAY_2026 = new Date('2026-08-09T23:59:59-03:00');
+function getDaysUntilFathersDay(): number | null {
+  const diffMs = FATHERS_DAY_2026.getTime() - Date.now();
+  if (diffMs <= 0) return null;
+  return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+}
+
 /** Página de entrada da rota pública /experimente — pensada pra quem chega direto de um anúncio
  * (Instagram/WhatsApp), sem contexto nenhum do produto. Sem isso, a pessoa caía direto no Passo 1
  * do wizard (upload de fotos) sem entender o que estava fazendo nem que dava pra ver o vídeo
  * pronto antes de pagar qualquer coisa — o que é exatamente o diferencial desse funil. */
 export const TrialLandingPage: React.FC<TrialLandingPageProps> = ({ onStart }) => {
+  const daysLeft = getDaysUntilFathersDay();
+
   return (
     <div className="max-w-3xl mx-auto space-y-10 py-6">
       {/* Hero */}
@@ -44,23 +56,29 @@ export const TrialLandingPage: React.FC<TrialLandingPageProps> = ({ onStart }) =
           <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold bg-amber-500/10 text-amber-300 border border-amber-500/20">
             <Clock className="w-3.5 h-3.5" /> Menos de 3 minutos
           </div>
+          {daysLeft !== null && (
+            <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold bg-rose-500/10 text-rose-300 border border-rose-500/20">
+              <CalendarHeart className="w-3.5 h-3.5" />
+              Faltam {daysLeft} dia{daysLeft === 1 ? '' : 's'} para o Dia dos Pais
+            </div>
+          )}
         </div>
 
         <h1 className="font-serif text-3xl sm:text-4xl font-semibold text-slate-100 tracking-tight leading-tight">
-          Crie um Vídeo Incrível pro Seu Pai — Ele Merece uma Homenagem à Altura
+          O Presente Que Vai Fazer Seu Pai Chorar de Emoção — Você Vê o Vídeo Antes de Pagar Qualquer Coisa
         </h1>
 
         <p className="text-slate-400 text-sm sm:text-base max-w-xl mx-auto leading-relaxed">
-          Em menos de 3 minutos, transforme as fotos do seu celular num vídeo de homenagem em HD,
-          com narração, trilha sonora e legendas — gerado por IA. Você vê o vídeo pronto, de
-          verdade, agora mesmo, sem pagar nada. Só libera sem marca d'água se gostar do resultado.
+          A Memora transforma fotos esquecidas no seu celular numa homenagem em vídeo, com
+          narração e trilha sonora — pronta em menos de 3 minutos. Assista o resultado completo
+          agora, de graça. Só paga se quiser levar sem marca d'água.
         </p>
 
         <button
           onClick={onStart}
           className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 hover:from-amber-400 hover:to-orange-400 text-black font-extrabold text-base rounded-2xl shadow-xl transition-all active:scale-98"
         >
-          Criar Meu Vídeo Grátis Agora <ArrowRight className="w-5 h-5" />
+          Ver Meu Vídeo Pronto Agora <ArrowRight className="w-5 h-5" />
         </button>
       </div>
 
@@ -101,7 +119,7 @@ export const TrialLandingPage: React.FC<TrialLandingPageProps> = ({ onStart }) =
           onClick={onStart}
           className="w-full py-4 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 hover:from-amber-400 hover:to-orange-400 text-black font-extrabold text-base rounded-2xl shadow-xl transition-all active:scale-98 flex items-center justify-center gap-2"
         >
-          Começar Agora <ArrowRight className="w-5 h-5" />
+          Ver Meu Vídeo Pronto Agora <ArrowRight className="w-5 h-5" />
         </button>
       </div>
     </div>
