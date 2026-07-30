@@ -19,6 +19,7 @@ import { getCreditPackageById } from './src/lib/creditCatalog';
 import { WebhookSignatureValidator, InvalidWebhookSignatureError } from 'mercadopago';
 import { isPaytWebhookConfigured, getPaytWebhookSecret } from './src/lib/payt';
 import { getPaytProductById } from './src/lib/paytCatalog';
+import { sendAccessGrantedEmail } from './src/lib/email';
 
 // Falha rápido com uma mensagem clara se faltar uma env var essencial ao funcionamento básico
 // do app — evita crash-loops confusos como o que já aconteceu (ver src/lib/envCheck.ts).
@@ -34,6 +35,7 @@ warnMissingEnv([
   { name: 'MERCADOPAGO_ACCESS_TOKEN', value: process.env.MERCADOPAGO_ACCESS_TOKEN },
   { name: 'MERCADOPAGO_WEBHOOK_SECRET', value: process.env.MERCADOPAGO_WEBHOOK_SECRET },
   { name: 'PAYT_WEBHOOK_SECRET', value: process.env.PAYT_WEBHOOK_SECRET },
+  { name: 'RESEND_API_KEY', value: process.env.RESEND_API_KEY },
 ]);
 
 const app = express();
@@ -659,6 +661,10 @@ app.post('/api/webhook/payt/:token', webhookLimiter, async (req, res) => {
 
     await grantInitialAccessByEmail({ email, name, credits: product.credits, packageId: product.packageId, amountBRL, externalId });
     console.log(`✅ ${product.credits} crédito(s) liberado(s) via webhook Payt para ${email}`);
+
+    // Login é só por e-mail, sem senha — sem esse aviso a pessoa paga e não tem como saber que
+    // já pode entrar, nem com qual e-mail. sendAccessGrantedEmail nunca lança erro pra fora.
+    await sendAccessGrantedEmail({ to: email, name, credits: product.credits });
   } catch (error: any) {
     console.error('Erro ao processar webhook Payt:', error);
   }
