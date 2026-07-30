@@ -63,3 +63,51 @@ export async function sendAccessGrantedEmail(params: { to: string; name?: string
     console.error(`Falha ao enviar e-mail de acesso para ${params.to}:`, error?.message || error);
   }
 }
+
+/**
+ * Dispara o e-mail com o link do vídeo liberado no funil "crie primeiro, pague depois" — quem
+ * paga por esse fluxo NÃO vira sócio (sem créditos, sem is_paid_member), então não faz sentido
+ * mandar pro login da área de membros como no e-mail acima: o link direto do cartão digital
+ * (/c/{id}, público, sem login) é o próprio destino final dessa pessoa.
+ */
+export async function sendTrialVideoUnlockedEmail(params: { to: string; name?: string; cardUrl: string }): Promise<void> {
+  if (!resend) {
+    console.warn(`E-mail de vídeo liberado não enviado para ${params.to} — RESEND_API_KEY não configurada.`);
+    return;
+  }
+
+  const firstName = (params.name || '').trim().split(' ')[0] || '';
+  const greeting = firstName ? `Oi, ${firstName}!` : 'Oi!';
+
+  const html = `
+    <div style="font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; color: #1e293b;">
+      <p style="font-size: 20px; font-weight: 700; margin: 0 0 16px;">${greeting} 💛</p>
+      <p style="font-size: 15px; line-height: 1.6; margin: 0 0 24px;">
+        Seu pagamento foi confirmado e seu vídeo em HD, <strong>sem marca d'água</strong>, já está pronto —
+        é só acessar o link abaixo pra assistir e baixar.
+      </p>
+      <a href="${params.cardUrl}" style="display: inline-block; background: linear-gradient(to right, #f59e0b, #f97316); color: #000; font-weight: 800; font-size: 14px; padding: 14px 28px; border-radius: 12px; text-decoration: none;">
+        Ver Meu Vídeo
+      </a>
+      <p style="font-size: 12px; color: #64748b; margin: 24px 0 0;">
+        ${params.cardUrl}
+      </p>
+    </div>
+  `.trim();
+
+  const text = `${greeting}\n\nSeu pagamento foi confirmado e seu vídeo em HD, sem marca d'água, já está pronto: ${params.cardUrl}`;
+
+  try {
+    const { error } = await resend.emails.send({
+      from: EMAIL_FROM,
+      to: params.to,
+      subject: 'Seu vídeo está pronto! 🎉',
+      html,
+      text,
+    });
+    if (error) throw error;
+    console.log(`📧 E-mail de vídeo liberado enviado para ${params.to}`);
+  } catch (error: any) {
+    console.error(`Falha ao enviar e-mail de vídeo liberado para ${params.to}:`, error?.message || error);
+  }
+}

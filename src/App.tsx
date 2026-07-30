@@ -41,7 +41,7 @@ export default function App() {
   const [videos, setVideos] = useState<VideoJob[]>(() => getStoredVideos());
   const [books, setBooks] = useState<MemoryBookJob[]>(() => getStoredBooks());
   const [currentView, setCurrentView] = useState<
-    'home' | 'choose-type' | 'create' | 'create-book' | 'card' | 'book-card' | 'detail'
+    'home' | 'choose-type' | 'create' | 'create-book' | 'card' | 'book-card' | 'detail' | 'trial-create'
   >('home');
   const [activeVideo, setActiveVideo] = useState<VideoJob | null>(null);
   const [activeBook, setActiveBook] = useState<MemoryBookJob | null>(null);
@@ -171,6 +171,15 @@ export default function App() {
       });
   }, []);
 
+  // Rota pública /experimente — funil "crie primeiro, pague depois", em teste A/B com o funil
+  // normal (paga primeiro na página de vendas, vira sócio, cria com créditos). Não exige login
+  // nem isPaidMember, então precisa ser checada antes de qualquer lógica de paywall abaixo.
+  useEffect(() => {
+    if (window.location.pathname.startsWith('/experimente')) {
+      setCurrentView('trial-create');
+    }
+  }, []);
+
   const handleStartCreation = () => {
     if (!user || !user.isPaidMember) {
       toast.error('É necessário ser um membro pagante para criar homenagens. Escolha seu plano.');
@@ -211,6 +220,24 @@ export default function App() {
     clearStoredUser();
     setUser(null);
   };
+
+  // Funil "crie primeiro, pague depois" — pública, sem login/paywall (ver useEffect acima)
+  if (currentView === 'trial-create') {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+        <Toaster theme={theme} position="top-center" richColors closeButton />
+        <main className="flex-1 px-4 sm:px-6 py-8 max-w-7xl mx-auto w-full">
+          <CreateVideoWizard
+            trialMode
+            onFinish={() => {}}
+            onCancel={() => {
+              window.location.href = '/';
+            }}
+          />
+        </main>
+      </div>
+    );
+  }
 
   // If viewing public card page, render card regardless of user auth
   if (currentView === 'card' && activeVideo) {

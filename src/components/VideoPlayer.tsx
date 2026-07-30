@@ -5,6 +5,7 @@ import { VideoJob, CaptionStyle } from '../types';
 import { drawVideoFrame, getAllSlides } from '../lib/video';
 import { PRESET_TRACKS, CAPTION_FONTS, CAPTION_COLORS, CAPTION_BACKGROUNDS } from '../data/presets';
 import { fetchVideoJobRemote } from '../lib/videoApi';
+import { requestTrialVideoUnlock } from '../lib/trialVideoApi';
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -20,6 +21,9 @@ interface VideoPlayerProps {
   video: VideoJob;
   editableCaptionStyle?: boolean;
   onCaptionStyleChange?: (style: CaptionStyle) => void;
+  // Funil "crie primeiro, pague depois" (rota pública /experimente): em vez de baixar o vídeo
+  // final direto, gera uma prévia com marca d'água e oferece um CTA pra liberar via Payt.
+  trialMode?: boolean;
 }
 
 // Dimensões de exportação por formato — o quadrado (1080x1080) é o padrão histórico do
@@ -30,7 +34,7 @@ const CANVAS_DIMENSIONS: Record<'classic' | 'vertical', { width: number; height:
   vertical: { width: 1080, height: 1920 },
 };
 
-export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaptionStyle = false, onCaptionStyleChange }) => {
+export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaptionStyle = false, onCaptionStyleChange, trialMode = false }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasDims = CANVAS_DIMENSIONS[video.aspectRatio === 'vertical' ? 'vertical' : 'classic'];
   const playerFrameRef = useRef<HTMLDivElement | null>(null);
@@ -55,6 +59,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaption
   const [isRecordingExport, setIsRecordingExport] = useState<boolean>(false);
   const [renderStatusLabel, setRenderStatusLabel] = useState<string>('');
   const [captionStyle, setCaptionStyle] = useState<CaptionStyle>(video.captionStyle || DEFAULT_CAPTION_STYLE);
+  // Estado só do funil "crie primeiro, pague depois" (trialMode) — a prévia com marca d'água
+  // renderizada de verdade (não o canvas), e o mini-formulário de e-mail pra liberar via Payt.
+  const [trialWatermarkUrl, setTrialWatermarkUrl] = useState<string>('');
+  const [unlockEmail, setUnlockEmail] = useState('');
+  const [unlockName, setUnlockName] = useState('');
+  const [isRequestingUnlock, setIsRequestingUnlock] = useState(false);
 
   const updateCaptionStyle = (partial: Partial<CaptionStyle>) => {
     setCaptionStyle((prev) => {
@@ -371,6 +381,89 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaption
     }
   };
 
+  // Mesmo padrão de fila + polling de handleDownloadVideo, mas gera a versão COM marca d'água
+  // (watermark: true) e mostra ela tocando na tela em vez de disparar um download — é assim que
+  // a pessoa vê o resultado real antes de decidir comprar.
+  const handleGenerateWatermarkedPreview = async () => {
+    setIsRecordingExport(true);
+    setRenderStatusLabel('Enviando para a fila de renderização...');
+    try {
+      const response = await fetch('/api/render-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          videoId: video.id,
+          fatherName: video.fatherName,
+          photos: video.photos,
+          aiImages: video.aiGeneratedImages,
+          useAIImages: video.useAIImages,
+          tributeText: video.tributeText,
+          narrationAudioDataUrl: video.customVoiceAudioUrl,
+          selectedTrackId: video.selectedTrackId,
+          captionStyle,
+          aspectRatio: video.aspectRatio,
+          watermark: true,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Falha ao enviar o vídeo para renderização no servidor.');
+      }
+
+      const { position } = await response.json();
+      setRenderStatusLabel(
+        position > 0
+          ? `Na fila (${position} vídeo${position > 1 ? 's' : ''} na sua frente)...`
+          : 'Renderizando prévia em HD...'
+      );
+
+      const MAX_ATTEMPTS = 80;
+      const POLL_INTERVAL_MS = 3000;
+      let mp4Url: string | null = null;
+
+      for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        await wait(POLL_INTERVAL_MS);
+        const updated = await fetchVideoJobRemote(video.id);
+        if (updated?.watermarkVideoUrl) {
+          mp4Url = updated.watermarkVideoUrl;
+          break;
+        }
+        if (attempt === 4) {
+          setRenderStatusLabel('Ainda finalizando — pode haver fila em horários de pico...');
+        }
+      }
+
+      if (!mp4Url) {
+        throw new Error('A renderização está demorando mais do que o esperado. Tente novamente em instantes.');
+      }
+
+      setTrialWatermarkUrl(mp4Url);
+    } catch (e: any) {
+      console.error(e);
+      toast.error('Erro ao gerar a prévia: ' + e.message);
+    } finally {
+      setIsRecordingExport(false);
+      setRenderStatusLabel('');
+    }
+  };
+
+  const handleRequestUnlock = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!unlockEmail.trim()) {
+      toast.error('Informe seu e-mail para liberar o vídeo.');
+      return;
+    }
+    setIsRequestingUnlock(true);
+    try {
+      const checkoutUrl = await requestTrialVideoUnlock(video.id, unlockEmail.trim(), unlockName.trim());
+      window.location.href = checkoutUrl;
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || 'Não foi possível continuar. Tente novamente.');
+      setIsRequestingUnlock(false);
+    }
+  };
+
   return (
     <div className="w-full flex flex-col items-center">
       {/* Background Audio Elements */}
@@ -397,65 +490,78 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaption
         className={`relative w-full ${video.aspectRatio === 'vertical' ? 'max-w-xs' : 'max-w-lg'} ${isFullscreen ? 'max-w-none h-full' : ''} bg-slate-900 rounded-2xl overflow-hidden shadow-2xl border border-slate-800 flex items-center justify-center group`}
         style={{ aspectRatio: isFullscreen ? undefined : `${canvasDims.width} / ${canvasDims.height}` }}
       >
-        <canvas
-          ref={canvasRef}
-          width={canvasDims.width}
-          height={canvasDims.height}
-          className={isFullscreen ? 'max-w-full max-h-full w-auto h-auto object-contain' : 'w-full h-full object-cover'}
-        />
+        {trialMode && trialWatermarkUrl ? (
+          <video
+            src={trialWatermarkUrl}
+            controls
+            autoPlay
+            className={isFullscreen ? 'max-w-full max-h-full w-auto h-auto object-contain' : 'w-full h-full object-contain bg-black'}
+          />
+        ) : (
+          <canvas
+            ref={canvasRef}
+            width={canvasDims.width}
+            height={canvasDims.height}
+            className={isFullscreen ? 'max-w-full max-h-full w-auto h-auto object-contain' : 'w-full h-full object-cover'}
+          />
+        )}
 
         {/* Video Overlays Controls — sempre visíveis (não só no hover), já que celular não tem
-            hover persistente e os controles ficavam invisíveis/exigiam toque duplo no mobile */}
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent flex flex-col justify-between p-6 z-20">
-          <div className="flex justify-end gap-2">
-            <button
-              onClick={handleMuteToggle}
-              className="p-3 bg-slate-900/80 hover:bg-slate-800 text-white rounded-full backdrop-blur-md border border-white/10 transition-transform active:scale-95"
-              title={isMuted ? 'Ativar som' : 'Mudar para mudo'}
-            >
-              {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
-            </button>
-            <button
-              onClick={handleToggleFullscreen}
-              className="p-3 bg-slate-900/80 hover:bg-slate-800 text-white rounded-full backdrop-blur-md border border-white/10 transition-transform active:scale-95"
-              title={isFullscreen ? 'Sair da tela cheia' : 'Ver em tela cheia'}
-            >
-              {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
-            </button>
-          </div>
-
-          <div className="flex flex-col gap-3">
-            {/* Progress bar */}
-            <div className="w-full bg-white/20 h-2 rounded-full overflow-hidden">
-              <div
-                className="bg-amber-400 h-full transition-all duration-100"
-                style={{ width: `${(currentTime / duration) * 100}%` }}
-              />
+            hover persistente e os controles ficavam invisíveis/exigiam toque duplo no mobile.
+            Escondidos quando mostra a prévia com marca d'água (vídeo <video> nativo já tem
+            controles próprios — os dois juntos ficariam duplicados/confusos). */}
+        {!(trialMode && trialWatermarkUrl) && (
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent flex flex-col justify-between p-6 z-20">
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={handleMuteToggle}
+                className="p-3 bg-slate-900/80 hover:bg-slate-800 text-white rounded-full backdrop-blur-md border border-white/10 transition-transform active:scale-95"
+                title={isMuted ? 'Ativar som' : 'Mudar para mudo'}
+              >
+                {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+              </button>
+              <button
+                onClick={handleToggleFullscreen}
+                className="p-3 bg-slate-900/80 hover:bg-slate-800 text-white rounded-full backdrop-blur-md border border-white/10 transition-transform active:scale-95"
+                title={isFullscreen ? 'Sair da tela cheia' : 'Ver em tela cheia'}
+              >
+                {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
+              </button>
             </div>
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={togglePlay}
-                  className="p-3.5 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-full shadow-lg transition-transform active:scale-95 flex items-center justify-center"
-                >
-                  {isPlaying ? <Pause className="w-6 h-6 fill-current" /> : <Play className="w-6 h-6 fill-current ml-0.5" />}
-                </button>
-                <button
-                  onClick={handleRestart}
-                  className="p-3 bg-slate-900/80 hover:bg-slate-800 text-white rounded-full backdrop-blur-md border border-white/10"
-                  title="Reiniciar"
-                >
-                  <RotateCcw className="w-5 h-5" />
-                </button>
+            <div className="flex flex-col gap-3">
+              {/* Progress bar */}
+              <div className="w-full bg-white/20 h-2 rounded-full overflow-hidden">
+                <div
+                  className="bg-amber-400 h-full transition-all duration-100"
+                  style={{ width: `${(currentTime / duration) * 100}%` }}
+                />
               </div>
 
-              <span className="text-xs font-mono font-medium text-slate-300 bg-slate-950/60 px-2.5 py-1 rounded-md">
-                {Math.floor(currentTime)}s / {Math.floor(duration)}s
-              </span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={togglePlay}
+                    className="p-3.5 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-full shadow-lg transition-transform active:scale-95 flex items-center justify-center"
+                  >
+                    {isPlaying ? <Pause className="w-6 h-6 fill-current" /> : <Play className="w-6 h-6 fill-current ml-0.5" />}
+                  </button>
+                  <button
+                    onClick={handleRestart}
+                    className="p-3 bg-slate-900/80 hover:bg-slate-800 text-white rounded-full backdrop-blur-md border border-white/10"
+                    title="Reiniciar"
+                  >
+                    <RotateCcw className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <span className="text-xs font-mono font-medium text-slate-300 bg-slate-950/60 px-2.5 py-1 rounded-md">
+                  {Math.floor(currentTime)}s / {Math.floor(duration)}s
+                </span>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Personalização da Legenda */}
@@ -527,14 +633,56 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaption
 
       {/* Action Buttons */}
       <div className="w-full max-w-lg mt-5 flex flex-col gap-3">
-        <button
-          onClick={handleDownloadVideo}
-          disabled={isRecordingExport}
-          className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-semibold text-sm rounded-xl border border-slate-700 flex items-center justify-center gap-2 transition-all active:scale-98 shadow-md"
-        >
-          <Download className="w-4 h-4 text-amber-400" />
-          {isRecordingExport ? renderStatusLabel || 'Renderizando vídeo em HD...' : 'Baixar Vídeo em HD (.MP4)'}
-        </button>
+        {trialMode ? (
+          trialWatermarkUrl ? (
+            <form onSubmit={handleRequestUnlock} className="space-y-3 bg-slate-900 border border-slate-800 rounded-2xl p-4">
+              <p className="text-sm font-bold text-slate-100 text-center">Gostou? Libere sem marca d'água</p>
+              <input
+                type="text"
+                value={unlockName}
+                onChange={(e) => setUnlockName(e.target.value)}
+                placeholder="Seu nome"
+                className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 text-sm focus:outline-none focus:border-amber-500"
+              />
+              <input
+                type="email"
+                required
+                value={unlockEmail}
+                onChange={(e) => setUnlockEmail(e.target.value)}
+                placeholder="Seu melhor e-mail"
+                className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 text-sm focus:outline-none focus:border-amber-500"
+              />
+              <button
+                type="submit"
+                disabled={isRequestingUnlock}
+                className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-60 text-black font-extrabold text-sm rounded-xl shadow-lg transition-transform active:scale-98"
+              >
+                {isRequestingUnlock ? 'Redirecionando...' : "Liberar Vídeo sem Marca d'Água"}
+              </button>
+              <p className="text-[11px] text-slate-500 text-center">
+                Você será redirecionado pro pagamento seguro. O vídeo em HD chega no seu e-mail assim que confirmar.
+              </p>
+            </form>
+          ) : (
+            <button
+              onClick={handleGenerateWatermarkedPreview}
+              disabled={isRecordingExport}
+              className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-60 text-black font-bold text-sm rounded-xl shadow-md flex items-center justify-center gap-2 transition-all active:scale-98"
+            >
+              <Download className="w-4 h-4" />
+              {isRecordingExport ? renderStatusLabel || 'Renderizando prévia...' : 'Gerar Prévia do Meu Vídeo'}
+            </button>
+          )
+        ) : (
+          <button
+            onClick={handleDownloadVideo}
+            disabled={isRecordingExport}
+            className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-semibold text-sm rounded-xl border border-slate-700 flex items-center justify-center gap-2 transition-all active:scale-98 shadow-md"
+          >
+            <Download className="w-4 h-4 text-amber-400" />
+            {isRecordingExport ? renderStatusLabel || 'Renderizando vídeo em HD...' : 'Baixar Vídeo em HD (.MP4)'}
+          </button>
+        )}
       </div>
     </div>
   );

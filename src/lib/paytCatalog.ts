@@ -1,6 +1,11 @@
 export interface PaytProductDef {
   credits: number;
   packageId: string;
+  // 'membership' (padrão, quando ausente) = compra inicial normal, vira sócio com créditos via
+  // grantInitialAccessByEmail. 'single-video-unlock' = funil "crie primeiro, pague depois": em
+  // vez de conceder créditos, libera o vídeo com marca d'água mais recente daquele e-mail (ver
+  // unlockMostRecentWatermarkedVideoByEmail em server.ts).
+  unlockType?: 'membership' | 'single-video-unlock';
 }
 
 /**
@@ -18,7 +23,21 @@ export interface PaytProductDef {
  */
 export const PAYT_PRODUCT_CATALOG: Record<string, PaytProductDef> = {
   LGA6NY: { credits: 5, packageId: 'payt-5-creditos' },
+  // TODO: substituir 'TROCAR_PELO_CODIGO_REAL' pelo product.code real do produto de vídeo avulso
+  // assim que ele for criado no painel da Payt (mesmo processo usado pra confirmar o LGA6NY: o
+  // payload bruto do primeiro evento de teste aparece no log da Railway). Enquanto isso, o
+  // webhook falha fechado pra esse produto — nenhum vídeo é liberado indevidamente.
+  TROCAR_PELO_CODIGO_REAL: { credits: 0, packageId: 'payt-video-avulso', unlockType: 'single-video-unlock' },
 };
+
+/**
+ * Link de checkout da Payt pro produto de vídeo avulso (funil "crie primeiro, pague depois") —
+ * diferente do produto de assinatura (SALES_PAGE_URL em src/data/presets.ts), a Payt gera um
+ * link de checkout por produto, então esse é um link à parte. Não é informação sensível (é pra
+ * ser clicado por qualquer visitante), então fica hardcoded aqui como o SALES_PAGE_URL, sem
+ * precisar de variável de ambiente.
+ */
+export const PAYT_TRIAL_UNLOCK_CHECKOUT_URL = 'https://checkout.payt.com.br/61f7dbb5551741c6974a6fe7fc32b454';
 
 export function getPaytProductById(productId: string): PaytProductDef | undefined {
   return PAYT_PRODUCT_CATALOG[productId];

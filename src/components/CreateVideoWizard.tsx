@@ -12,15 +12,20 @@ import {
 import { VideoPlayer } from './VideoPlayer';
 import { saveVideoJob } from '../lib/credits';
 import { uploadVideoJobMedia, saveVideoJobRemote } from '../lib/videoApi';
+import { saveTrialVideoRemote } from '../lib/trialVideoApi';
 import { deductCreditRemote } from '../lib/authApi';
 import { PRESET_VOICES, PRESET_TRACKS } from '../data/presets';
 import { saveDraft, loadDraft, clearDraft } from '../lib/draftPersistence';
 
 interface CreateVideoWizardProps {
-  user: User;
-  setUser: React.Dispatch<React.SetStateAction<User>>;
+  // Ausentes no funil "crie primeiro, pague depois" (trialMode) — a pessoa ainda não tem conta.
+  user?: User;
+  setUser?: React.Dispatch<React.SetStateAction<User>>;
   onFinish: (video: VideoJob) => void;
   onCancel: () => void;
+  // Rota pública /experimente: pula dedução de crédito e usa os endpoints públicos de prévia
+  // (ver src/lib/trialVideoApi.ts) em vez dos endpoints normais, que exigem dono autenticado.
+  trialMode?: boolean;
 }
 
 const DRAFT_KEY = 'memorias_video_wizard_draft';
@@ -50,6 +55,7 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
   setUser,
   onFinish,
   onCancel,
+  trialMode = false,
 }) => {
   // Lido uma única vez, na montagem — protege contra perder o progresso se a aba fechar/travar
   // no meio do preenchimento. Nunca restaura direto no Passo 6 (prévia): a esse ponto o crédito
@@ -69,7 +75,7 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
   const [photos, setPhotos] = useState<PhotoItem[]>(initialDraft?.photos || []);
   const [aiOnlyMode, setAiOnlyMode] = useState<boolean>(initialDraft?.aiOnlyMode || false);
   const [fatherName, setFatherName] = useState<string>(initialDraft?.fatherName || '');
-  const [authorName, setAuthorName] = useState<string>(initialDraft?.authorName || user.name || '');
+  const [authorName, setAuthorName] = useState<string>(initialDraft?.authorName || user?.name || '');
   const [tributeText, setTributeText] = useState<string>(initialDraft?.tributeText || '');
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>(initialDraft?.selectedVoiceId || PRESET_VOICES[0].id);
   const [isCustomVoice, setIsCustomVoice] = useState<boolean>(initialDraft?.isCustomVoice || false);
@@ -122,7 +128,7 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
     setPhotos([]);
     setAiOnlyMode(false);
     setFatherName('');
-    setAuthorName(user.name || '');
+    setAuthorName(user?.name || '');
     setTributeText('');
     setSelectedVoiceId(PRESET_VOICES[0].id);
     setIsCustomVoice(false);
@@ -145,24 +151,30 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
   const [isGeneratingJob, setIsGeneratingJob] = useState<boolean>(false);
 
   const handleGeneratePreviewJob = async () => {
-    if (user.credits < 1) {
-      toast.error('Você não tem créditos suficientes para criar um novo vídeo. Adicione créditos no seu painel.');
-      return;
+    if (!trialMode) {
+      if (!user || user.credits < 1) {
+        toast.error('Você não tem créditos suficientes para criar um novo vídeo. Adicione créditos no seu painel.');
+        return;
+      }
     }
 
     setIsGeneratingJob(true);
 
     // O crédito representa "quantos vídeos essa pessoa pode criar" — é gasto aqui, na criação,
-    // já que não existe mais etapa de desbloqueio (a pessoa já está numa área paga).
-    let updatedUser: User;
-    try {
-      updatedUser = await deductCreditRemote(user.id, user.sessionToken || '');
-    } catch (e: any) {
-      toast.error(e.message || 'Não foi possível criar o vídeo agora. Tente novamente.');
-      setIsGeneratingJob(false);
-      return;
+    // já que não existe mais etapa de desbloqueio (a pessoa já está numa área paga). No funil
+    // "crie primeiro, pague depois" (trialMode) não existe crédito nenhum ainda — a pessoa nem
+    // tem conta — então esse passo inteiro é pulado.
+    if (!trialMode && user && setUser) {
+      let updatedUser: User;
+      try {
+        updatedUser = await deductCreditRemote(user.id, user.sessionToken || '');
+      } catch (e: any) {
+        toast.error(e.message || 'Não foi possível criar o vídeo agora. Tente novamente.');
+        setIsGeneratingJob(false);
+        return;
+      }
+      setUser(updatedUser);
     }
-    setUser(updatedUser);
 
     const videoId = `vid_${Date.now()}`;
     const cardUrl = `${window.location.origin}/c/${videoId}`;
@@ -177,7 +189,7 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
 
     const newJob: VideoJob = {
       id: videoId,
-      userId: user.id,
+      userId: user?.id || '',
       title: `Homenagem para ${fatherName || 'Pai'}`,
       fatherName: fatherName || 'Pai Especial',
       photos: validPhotos,
@@ -189,8 +201,10 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
       useAIImages,
       aiGeneratedImages: aiImages,
       aspectRatio,
-      status: 'unlocked',
-      progress: 100,
+      // No funil de prévia o vídeo começa 'draft' — só vira 'watermarked' quando a prévia com
+      // marca d'água é renderizada (ver /api/render-video), e 'unlocked' só depois do pagamento.
+      status: trialMode ? 'draft' : 'unlocked',
+      progress: trialMode ? 0 : 100,
       cardUrl,
       createdAt: new Date().toISOString(),
       durationSeconds: Math.max(25, (validPhotos.length + (useAIImages ? aiImages.length : 0)) * 6),
@@ -210,8 +224,12 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
     setSyncError('');
     try {
       const jobWithRemoteMedia = await uploadVideoJobMedia(newJob);
-      saveVideoJob(jobWithRemoteMedia);
-      await saveVideoJobRemote(jobWithRemoteMedia, user.sessionToken || '');
+      if (trialMode) {
+        await saveTrialVideoRemote(jobWithRemoteMedia);
+      } else {
+        saveVideoJob(jobWithRemoteMedia);
+        await saveVideoJobRemote(jobWithRemoteMedia, user?.sessionToken || '');
+      }
       setCreatedJob(jobWithRemoteMedia);
     } catch (e: any) {
       console.error('Erro ao sincronizar vídeo com o servidor:', e);
@@ -366,24 +384,29 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
           <div className="space-y-6 text-center">
             <div className="space-y-2">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
-                <CheckCircle2 className="w-3.5 h-3.5" /> Vídeo Pronto em HD!
+                <CheckCircle2 className="w-3.5 h-3.5" /> {trialMode ? 'Sua Homenagem Está Montada!' : 'Vídeo Pronto em HD!'}
               </span>
               <h3 className="text-2xl font-bold text-slate-100">
                 Sua Homenagem para {createdJob.fatherName} está pronta
               </h3>
               <p className="text-slate-400 text-sm max-w-md mx-auto">
-                Baixe o vídeo em HD ou avance para pegar o link do Cartão Digital e enviar para o seu pai.
+                {trialMode
+                  ? 'Gere a prévia com marca d\'água pra ver o resultado real — se gostar, é só liberar sem marca d\'água.'
+                  : 'Baixe o vídeo em HD ou avance para pegar o link do Cartão Digital e enviar para o seu pai.'}
               </p>
             </div>
 
             <VideoPlayer
               video={createdJob}
               editableCaptionStyle
+              trialMode={trialMode}
               onCaptionStyleChange={(style: CaptionStyle) => {
                 setCreatedJob((prev) => (prev ? { ...prev, captionStyle: style } : prev));
-                saveVideoJobRemote({ ...createdJob, captionStyle: style }, user.sessionToken || '').catch((err) =>
-                  console.warn('Falha ao salvar estilo de legenda no servidor:', err)
-                );
+                if (!trialMode) {
+                  saveVideoJobRemote({ ...createdJob, captionStyle: style }, user?.sessionToken || '').catch((err) =>
+                    console.warn('Falha ao salvar estilo de legenda no servidor:', err)
+                  );
+                }
               }}
             />
 
@@ -399,12 +422,14 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
               </div>
             )}
 
-            <button
-              onClick={() => onFinish(createdJob)}
-              className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-extrabold text-sm rounded-xl shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2 mx-auto"
-            >
-              <Sparkles className="w-4 h-4" /> Ver Cartão Digital e Compartilhar
-            </button>
+            {!trialMode && (
+              <button
+                onClick={() => onFinish(createdJob)}
+                className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-extrabold text-sm rounded-xl shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2 mx-auto"
+              >
+                <Sparkles className="w-4 h-4" /> Ver Cartão Digital e Compartilhar
+              </button>
+            )}
           </div>
         )}
       </div>

@@ -36,6 +36,57 @@ export interface RenderVideoParams {
   selectedTrackId?: string;
   captionStyle?: CaptionStyle;
   aspectRatio?: 'classic' | 'vertical';
+  // Quando true, renderiza a prévia do funil "crie primeiro, pague depois" (ver
+  // buildWatermarkGridFilters abaixo) — vídeo real, mas coberto o suficiente pra não dar pra usar
+  // sem pagar. Nunca usado junto com dedução de crédito (esse job nunca teve dono pago ainda).
+  watermark?: boolean;
+}
+
+const WATERMARK_TEXT = 'PRÉVIA — MEMORA.COM.BR';
+
+/**
+ * Cobre o frame inteiro com o mesmo texto repetido em grade (estilo banco de imagens) — o
+ * drawtext do FFmpeg não suporta rotação de texto nativamente (só dá pra girar renderizando uma
+ * imagem à parte), então a grade fica na horizontal mesmo; ainda assim quebra o suficiente pra
+ * impedir uso direto do vídeo. O tamanho da célula é fixo em pixels e o número de colunas/linhas
+ * é calculado a partir da largura/altura reais de saída, então funciona igual nos dois formatos
+ * (clássico 1080x1080 e vertical 1080x1920) sem precisar de grade hardcoded por formato.
+ */
+function buildWatermarkGridFilters(
+  videoLabel: string,
+  outputWidth: number,
+  outputHeight: number,
+  tempFilesToDelete: string[]
+): { filters: string[]; videoLabel: string } {
+  const CELL_WIDTH = 380;
+  const CELL_HEIGHT = 230;
+  const cols = Math.ceil(outputWidth / CELL_WIDTH);
+  const rows = Math.ceil(outputHeight / CELL_HEIGHT);
+
+  const watermarkTextPath = writeTempTextFile(WATERMARK_TEXT, 'watermark');
+  tempFilesToDelete.push(watermarkTextPath);
+
+  const filters: string[] = [];
+  let label = videoLabel;
+  let cellIndex = 0;
+  for (let row = 0; row < rows; row++) {
+    // Desloca linhas alternadas em meia célula (padrão "tijolo") — evita que a grade pareça um
+    // reticulado perfeitamente alinhado, o que facilitaria recortar entre as marcas.
+    const rowOffsetX = row % 2 === 0 ? 0 : CELL_WIDTH / 2;
+    for (let col = 0; col < cols; col++) {
+      const x = col * CELL_WIDTH + rowOffsetX;
+      const y = row * CELL_HEIGHT;
+      const outLabel = `vwm${cellIndex}`;
+      filters.push(
+        `[${label}]drawtext=textfile=${quoteFilterPath(watermarkTextPath)}:fontfile=${quoteFilterPath(TITLE_FONT_PATH)}:` +
+        `fontsize=26:fontcolor=white@0.45:borderw=2:bordercolor=black@0.35:x=${x}:y=${y}[${outLabel}]`
+      );
+      label = outLabel;
+      cellIndex++;
+    }
+  }
+
+  return { filters, videoLabel: label };
 }
 
 // 'classic' (1080x1080) é o formato quadrado histórico do produto; 'vertical' (1080x1920, 9:16)
@@ -132,7 +183,10 @@ export async function renderVideoWithFFmpeg(params: RenderVideoParams): Promise<
     fs.mkdirSync(publicRendersDir, { recursive: true });
   }
 
-  const outputFileName = `render_${params.videoId}.mp4`;
+  // Sufixo diferente pra versão com marca d'água — sem isso, renderizar a prévia (watermark)
+  // e depois a versão limpa do MESMO videoId (após o desbloqueio) acharia o arquivo da prévia
+  // já em disco e devolveria ele de novo, sem nunca gerar a versão sem marca d'água de verdade.
+  const outputFileName = `render_${params.videoId}${params.watermark ? '_wm' : ''}.mp4`;
   const outputFilePath = path.join(publicRendersDir, outputFileName);
   const publicVideoUrl = `/renders/${outputFileName}`;
 
@@ -299,6 +353,13 @@ export async function renderVideoWithFFmpeg(params: RenderVideoParams): Promise<
           );
           videoLabel = outLabel;
         });
+      }
+
+      // --- Marca d'água (só na prévia do funil "crie primeiro, pague depois") ---
+      if (params.watermark) {
+        const watermarkResult = buildWatermarkGridFilters(videoLabel, outputWidth, outputHeight, tempFilesToDelete);
+        filters.push(...watermarkResult.filters);
+        videoLabel = watermarkResult.videoLabel;
       }
 
       // --- Áudio: narração + trilha sonora mixadas ---

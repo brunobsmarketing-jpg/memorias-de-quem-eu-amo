@@ -18,8 +18,8 @@ import {
 import { getCreditPackageById } from './src/lib/creditCatalog';
 import { WebhookSignatureValidator, InvalidWebhookSignatureError } from 'mercadopago';
 import { isPaytWebhookConfigured, getPaytWebhookSecret } from './src/lib/payt';
-import { getPaytProductById } from './src/lib/paytCatalog';
-import { sendAccessGrantedEmail } from './src/lib/email';
+import { getPaytProductById, PAYT_TRIAL_UNLOCK_CHECKOUT_URL } from './src/lib/paytCatalog';
+import { sendAccessGrantedEmail, sendTrialVideoUnlockedEmail } from './src/lib/email';
 import { MAX_TRIBUTE_TEXT_CHARS } from './src/data/presets';
 
 // Falha rápido com uma mensagem clara se faltar uma env var essencial ao funcionamento básico
@@ -81,6 +81,17 @@ const webhookLimiter = rateLimit({
   limit: 60,
   standardHeaders: true,
   legacyHeaders: false,
+});
+// Endpoints do funil "crie primeiro, pague depois" (/api/trial-videos) não passam por
+// requireOwnership — são públicos de propósito (sem cadastro prévio) — então merecem um limite
+// mais apertado que o accountLimiter normal, já que não há nenhuma barreira de pagamento
+// impedindo alguém de ficar criando prévias em loop.
+const trialLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 8,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Muitas prévias criadas em pouco tempo. Aguarde um pouco e tente novamente.' },
 });
 
 // Serve a pasta de vídeos renderizados em MP4
@@ -592,6 +603,64 @@ async function revokeInitialAccessByEmail(email: string, reason: string) {
   return updated;
 }
 
+/** Desbloqueia o vídeo do funil "crie primeiro, pague depois" depois que a Payt confirma o
+ * pagamento do produto de vídeo avulso. A Payt não amarra a compra a uma referência específica
+ * (só informa o e-mail — ver PAYT_TRIAL_UNLOCK_CHECKOUT_URL em src/lib/paytCatalog.ts), então a
+ * regra é: libera o vídeo com status 'watermarked' MAIS RECENTE daquele e-mail. Cobre bem o caso
+ * normal (cria uma prévia, gosta, compra na hora); se a pessoa tiver várias prévias pendentes do
+ * mesmo e-mail, só a mais recente é liberada. */
+async function unlockMostRecentWatermarkedVideoByEmail(email: string) {
+  const normalizedEmail = String(email).trim().toLowerCase();
+
+  const { data: user, error: userError } = await supabaseAdmin
+    .from('app_users')
+    .select('id')
+    .eq('email', normalizedEmail)
+    .maybeSingle();
+  if (userError) throw userError;
+  if (!user) {
+    console.warn(`Webhook Payt (vídeo avulso): nenhuma conta encontrada para ${normalizedEmail} — nenhum vídeo liberado.`);
+    return;
+  }
+
+  const { data: job, error: jobError } = await supabaseAdmin
+    .from('video_jobs')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('status', 'watermarked')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (jobError) throw jobError;
+  if (!job) {
+    console.warn(`Webhook Payt (vídeo avulso): nenhuma prévia pendente encontrada para ${normalizedEmail} — nenhum vídeo liberado.`);
+    return;
+  }
+
+  console.log(`🔓 Desbloqueando vídeo avulso ${job.id} para ${normalizedEmail}...`);
+  const durableMp4Url = await renderAndPublishVideo({
+    videoId: job.id,
+    fatherName: job.father_name || 'Pai',
+    photos: job.photos || [],
+    aiImages: job.ai_generated_images || [],
+    useAIImages: !!job.use_ai_images,
+    tributeText: job.tribute_text || '',
+    narrationAudioDataUrl: job.custom_voice_audio_url || undefined,
+    selectedTrackId: job.selected_track_id || undefined,
+    captionStyle: job.caption_style || undefined,
+    aspectRatio: (job.aspect_ratio as 'classic' | 'vertical') || 'classic',
+    watermark: false,
+  });
+
+  await supabaseAdmin.from('video_jobs').update({ unlocked_video_url: durableMp4Url, status: 'unlocked' }).eq('id', job.id);
+  console.log(`✅ Vídeo avulso ${job.id} liberado (sem marca d'água) para ${normalizedEmail}`);
+
+  // Esse funil não vira sócio (sem login/área de membros) — o cartão digital público (/c/{id})
+  // é o próprio destino final, então o e-mail manda direto pra lá em vez de pro login.
+  const cardUrl = job.card_url || `${(process.env.APP_URL || 'https://app.memoriasdequemeuamo.com.br').replace(/\/$/, '')}/c/${job.id}`;
+  await sendTrialVideoUnlockedEmail({ to: normalizedEmail, cardUrl });
+}
+
 // Webhook (postback) da Payt — usado só pra compra inicial (virar membro pago), feita numa
 // página de vendas fora deste app. Autenticado por um token secreto na própria URL (configurado
 // no painel da Payt), já que a Payt não documenta um esquema de assinatura HMAC como a Mercado
@@ -657,6 +726,13 @@ app.post('/api/webhook/payt/:token', webhookLimiter, async (req, res) => {
     const product = getPaytProductById(productId);
     if (!product) {
       console.error(`Webhook Payt: productId desconhecido ("${productId}") — nenhum crédito liberado. Atualize src/lib/paytCatalog.ts com o ID real.`);
+      return;
+    }
+
+    if (product.unlockType === 'single-video-unlock') {
+      // Funil "crie primeiro, pague depois": não concede créditos nem membership, só libera o
+      // vídeo com marca d'água mais recente daquele e-mail (ver função acima).
+      await unlockMostRecentWatermarkedVideoByEmail(email);
       return;
     }
 
@@ -826,6 +902,152 @@ app.get('/api/videos/:id', async (req, res) => {
   } catch (error: any) {
     console.error('Erro ao buscar vídeo no Supabase:', error);
     res.status(500).json({ error: 'Falha ao buscar vídeo', details: error.message });
+  }
+});
+
+// --- Funil "crie primeiro, pague depois" (rota pública /experimente) ---
+// Diferente de /api/videos, esses dois endpoints NÃO passam por requireOwnership: a pessoa ainda
+// não tem conta/sessão nenhuma quando cria a prévia (e-mail só é pedido no momento de comprar).
+// Pra satisfazer a constraint NOT NULL de video_jobs.user_id, cria uma linha "anônima" em
+// app_users (sem e-mail, sem créditos, is_paid_member=false) — que só ganha um e-mail de verdade
+// se a pessoa decidir tentar desbloquear (ver /request-unlock abaixo).
+
+/** Salva (cria ou atualiza) um vídeo de prévia do funil "crie primeiro, pague depois". */
+app.post('/api/trial-videos', trialLimiter, async (req, res) => {
+  try {
+    const job = req.body;
+    if (!job || !job.id) {
+      return res.status(400).json({ error: 'Vídeo inválido: id é obrigatório' });
+    }
+    if ((job.photos?.length || 0) > MAX_PHOTOS_PER_JOB || (job.aiGeneratedImages?.length || 0) > MAX_AI_IMAGES_PER_JOB) {
+      return res.status(400).json({ error: 'Número de fotos/imagens excede o limite permitido.' });
+    }
+
+    // Se o job já existe (ex: reenvio), reaproveita o dono anônimo que já foi criado da primeira
+    // vez, em vez de gerar um app_users órfão novo a cada chamada.
+    const { data: existingJob } = await supabaseAdmin
+      .from('video_jobs')
+      .select('user_id')
+      .eq('id', job.id)
+      .maybeSingle();
+
+    let anonymousUserId = existingJob?.user_id;
+    if (!anonymousUserId) {
+      const { data: anonUser, error: anonUserError } = await supabaseAdmin
+        .from('app_users')
+        .insert({
+          id: `trial_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          name: job.fatherName ? `Prévia para ${job.fatherName}` : 'Visitante (prévia)',
+          credits: 0,
+          is_paid_member: false,
+        })
+        .select('id')
+        .single();
+      if (anonUserError) throw anonUserError;
+      anonymousUserId = anonUser.id;
+    }
+
+    const row: Record<string, any> = {
+      id: job.id,
+      user_id: anonymousUserId,
+      title: job.title,
+      father_name: job.fatherName,
+      photos: job.photos || [],
+      tribute_text: job.tributeText,
+      selected_voice_id: job.selectedVoiceId,
+      is_custom_voice: !!job.isCustomVoice,
+      custom_voice_audio_url: job.customVoiceAudioUrl || null,
+      selected_track_id: job.selectedTrackId,
+      use_ai_images: !!job.useAIImages,
+      ai_generated_images: job.aiGeneratedImages || [],
+      status: job.status || 'draft',
+      progress: job.progress || 0,
+      card_url: job.cardUrl || '',
+      created_at: job.createdAt || new Date().toISOString(),
+      duration_seconds: job.durationSeconds || 30,
+      caption_style: job.captionStyle || null,
+      aspect_ratio: job.aspectRatio || 'classic',
+    };
+
+    let error: any = null;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      ({ error } = await supabaseAdmin.from('video_jobs').upsert(row, { onConflict: 'id' }));
+      const missingColumn = extractMissingColumnName(error?.message);
+      if (!error || !missingColumn || !(missingColumn in row)) break;
+      console.warn(`Coluna ${missingColumn} ausente/desatualizada no Supabase — salvando prévia sem esse campo.`);
+      delete row[missingColumn];
+    }
+    if (error) throw error;
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Erro ao salvar vídeo de prévia no Supabase:', error);
+    res.status(500).json({ error: 'Falha ao salvar prévia', details: error.message });
+  }
+});
+
+/** Capturado o e-mail no clique de "Liberar sem marca d'água", associa esse e-mail (novo ou já
+ * existente) ao dono do vídeo e devolve o link de checkout da Payt pro produto de vídeo avulso.
+ * O desbloqueio de verdade só acontece depois, quando o webhook da Payt confirmar o pagamento
+ * (ver unlockMostRecentWatermarkedVideoByEmail). */
+app.post('/api/trial-videos/:id/request-unlock', trialLimiter, async (req, res) => {
+  try {
+    const { email, name } = req.body;
+    if (!email || !String(email).trim()) {
+      return res.status(400).json({ error: 'E-mail é obrigatório para liberar o vídeo.' });
+    }
+    if (!PAYT_TRIAL_UNLOCK_CHECKOUT_URL) {
+      console.error('Funil de prévia: PAYT_TRIAL_UNLOCK_CHECKOUT_URL não configurada.');
+      return res.status(503).json({ error: 'Liberação de vídeo avulso ainda não está disponível. Tente novamente mais tarde.' });
+    }
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+
+    const { data: job, error: jobError } = await supabaseAdmin
+      .from('video_jobs')
+      .select('id, user_id, status')
+      .eq('id', req.params.id)
+      .maybeSingle();
+    if (jobError) throw jobError;
+    if (!job) {
+      return res.status(404).json({ error: 'Vídeo não encontrado.' });
+    }
+    if (job.status !== 'watermarked') {
+      return res.status(400).json({ error: 'Gere a prévia com marca d\'água antes de tentar liberar o vídeo.' });
+    }
+
+    // Se já existe uma conta com esse e-mail (ex: pessoa já é membro testando esse funil também,
+    // ou já tentou uma prévia antes com o mesmo e-mail), reaproveita ela em vez de violar a
+    // constraint "email unique" tentando gravar o e-mail na linha anônima atual.
+    const { data: existingUser, error: findUserError } = await supabaseAdmin
+      .from('app_users')
+      .select('id')
+      .eq('email', normalizedEmail)
+      .maybeSingle();
+    if (findUserError) throw findUserError;
+
+    let targetUserId: string;
+    if (existingUser) {
+      targetUserId = existingUser.id;
+    } else {
+      const { data: updatedAnon, error: updateAnonError } = await supabaseAdmin
+        .from('app_users')
+        .update({ email: normalizedEmail, name: name || undefined })
+        .eq('id', job.user_id)
+        .select('id')
+        .single();
+      if (updateAnonError) throw updateAnonError;
+      targetUserId = updatedAnon.id;
+    }
+
+    if (targetUserId !== job.user_id) {
+      await supabaseAdmin.from('video_jobs').update({ user_id: targetUserId }).eq('id', job.id);
+    }
+
+    res.json({ checkoutUrl: PAYT_TRIAL_UNLOCK_CHECKOUT_URL });
+  } catch (error: any) {
+    console.error('Erro ao processar solicitação de desbloqueio:', error);
+    res.status(500).json({ error: 'Falha ao processar solicitação', details: error.message });
   }
 });
 
@@ -1301,6 +1523,59 @@ app.post('/api/clone-voice', expensiveAiLimiter, async (req, res) => {
   }
 });
 
+interface RenderAndPublishParams {
+  videoId: string;
+  fatherName: string;
+  photos: any;
+  aiImages: any;
+  useAIImages: boolean;
+  tributeText: string;
+  narrationAudioDataUrl?: string;
+  selectedTrackId?: string;
+  captionStyle?: any;
+  aspectRatio?: 'classic' | 'vertical';
+  watermark?: boolean;
+}
+
+/**
+ * Roda o FFmpeg (via fila) e sobe o MP4 resultante pro Supabase Storage — extraído de
+ * /api/render-video pra ser reaproveitado também pelo desbloqueio via webhook da Payt do funil
+ * "crie primeiro, pague depois" (ver unlockMostRecentWatermarkedVideoByEmail abaixo), que dispara
+ * a MESMA renderização (só que sem marca d'água) a partir dos dados já salvos no video_jobs, sem
+ * passar por uma requisição HTTP do cliente.
+ */
+async function renderAndPublishVideo(params: RenderAndPublishParams): Promise<string> {
+  const localMp4Path = await renderQueue.run(async () => {
+    const { renderVideoWithFFmpeg } = await import('./src/lib/ffmpeg_render.js');
+    console.log(`🎬 Iniciando renderização FFmpeg para vídeo ${params.videoId}${params.watermark ? ' (prévia com marca d\'água)' : ''}...`);
+    return renderVideoWithFFmpeg(params);
+  });
+
+  // Sobe o MP4 renderizado para o Supabase Storage — em produção (Railway) o disco local
+  // é efêmero e some a cada reinício/redeploy, então o arquivo local sozinho não é confiável.
+  const absoluteLocalPath = path.join(process.cwd(), 'public', localMp4Path.replace(/^\//, ''));
+  const fileBuffer = fs.readFileSync(absoluteLocalPath);
+  const storagePath = `videos/${params.videoId}/${params.watermark ? 'watermark' : 'render'}.mp4`;
+  const { error: uploadError } = await supabaseAdmin.storage
+    .from(MEDIA_BUCKET)
+    .upload(storagePath, fileBuffer, { contentType: 'video/mp4', upsert: true });
+  if (uploadError) throw uploadError;
+
+  const { data: publicUrlData } = supabaseAdmin.storage.from(MEDIA_BUCKET).getPublicUrl(storagePath);
+  const durableMp4Url = publicUrlData.publicUrl;
+
+  // Uma vez que a cópia durável já está no Storage, o MP4 local em public/renders/ não serve
+  // mais pra nada (o disco da Railway é efêmero, então nem sobrevive a um redeploy) — apagar
+  // agora evita que ele fique acumulando e enchendo o disco num pico de criações.
+  try {
+    fs.unlinkSync(absoluteLocalPath);
+  } catch (cleanupErr) {
+    console.warn(`⚠️ Não foi possível apagar o MP4 local de ${params.videoId}:`, cleanupErr);
+  }
+
+  return durableMp4Url;
+}
+
 // 6. Server-Side FFmpeg Video Rendering Endpoint
 // Responde imediatamente (202) com o vídeo entrando na fila de renderização, e processa o
 // FFmpeg + upload em segundo plano — o cliente acompanha o progresso via GET /api/videos/:id
@@ -1308,7 +1583,7 @@ app.post('/api/clone-voice', expensiveAiLimiter, async (req, res) => {
 // minutos quando há fila (ver RenderQueue acima), o que arriscaria timeout no proxy em
 // picos de tráfego.
 app.post('/api/render-video', renderLimiter, async (req, res) => {
-  const { videoId, fatherName, photos, aiImages, useAIImages, tributeText, narrationAudioDataUrl, selectedTrackId, captionStyle, aspectRatio } = req.body;
+  const { videoId, fatherName, photos, aiImages, useAIImages, tributeText, narrationAudioDataUrl, selectedTrackId, captionStyle, aspectRatio, watermark } = req.body;
 
   // No modo "só IA" o vídeo não tem nenhuma foto real — o conteúdo visual inteiro vem de
   // aiImages. Validar só "photos" rejeitava esses vídeos com 400 antes mesmo de chegar no
@@ -1330,47 +1605,27 @@ app.post('/api/render-video', renderLimiter, async (req, res) => {
   }
 
   try {
-    const localMp4Path = await renderQueue.run(async () => {
-      const { renderVideoWithFFmpeg } = await import('./src/lib/ffmpeg_render.js');
-      console.log(`🎬 Iniciando renderização FFmpeg para vídeo ${finalVideoId}...`);
-      return renderVideoWithFFmpeg({
-        videoId: finalVideoId,
-        fatherName: fatherName || 'Pai',
-        photos,
-        aiImages,
-        useAIImages,
-        tributeText: tributeText || '',
-        narrationAudioDataUrl,
-        selectedTrackId,
-        captionStyle,
-        aspectRatio,
-      });
+    const durableMp4Url = await renderAndPublishVideo({
+      videoId: finalVideoId,
+      fatherName: fatherName || 'Pai',
+      photos,
+      aiImages,
+      useAIImages,
+      tributeText: tributeText || '',
+      narrationAudioDataUrl,
+      selectedTrackId,
+      captionStyle,
+      aspectRatio,
+      watermark: !!watermark,
     });
 
-    // Sobe o MP4 renderizado para o Supabase Storage — em produção (Render) o disco local
-    // é efêmero e some a cada reinício/redeploy, então o arquivo local sozinho não é confiável.
-    const absoluteLocalPath = path.join(process.cwd(), 'public', localMp4Path.replace(/^\//, ''));
-    const fileBuffer = fs.readFileSync(absoluteLocalPath);
-    const storagePath = `videos/${finalVideoId}/render.mp4`;
-    const { error: uploadError } = await supabaseAdmin.storage
-      .from(MEDIA_BUCKET)
-      .upload(storagePath, fileBuffer, { contentType: 'video/mp4', upsert: true });
-    if (uploadError) throw uploadError;
-
-    const { data: publicUrlData } = supabaseAdmin.storage.from(MEDIA_BUCKET).getPublicUrl(storagePath);
-    const durableMp4Url = publicUrlData.publicUrl;
-
-    // Mantém o vídeo salvo no banco central atualizado com a URL definitiva do MP4 em HD
-    await supabaseAdmin.from('video_jobs').update({ unlocked_video_url: durableMp4Url }).eq('id', finalVideoId);
-
-    // Uma vez que a cópia durável já está no Storage, o MP4 local em public/renders/ não serve
-    // mais pra nada (o disco da Railway é efêmero, então nem sobrevive a um redeploy) — apagar
-    // agora evita que ele fique acumulando e enchendo o disco num pico de criações.
-    try {
-      fs.unlinkSync(absoluteLocalPath);
-    } catch (cleanupErr) {
-      console.warn(`⚠️ Não foi possível apagar o MP4 local de ${finalVideoId}:`, cleanupErr);
-    }
+    // Prévia com marca d'água (funil "crie primeiro, pague depois") grava em watermark_video_url
+    // e mantém status 'watermarked' — o desbloqueio de verdade só acontece no webhook da Payt
+    // (ver unlockMostRecentWatermarkedVideoByEmail), nunca aqui.
+    const updatePayload = watermark
+      ? { watermark_video_url: durableMp4Url, status: 'watermarked' }
+      : { unlocked_video_url: durableMp4Url };
+    await supabaseAdmin.from('video_jobs').update(updatePayload).eq('id', finalVideoId);
 
     console.log(`✅ Renderização concluída e publicada para ${finalVideoId}`);
   } catch (error: any) {
