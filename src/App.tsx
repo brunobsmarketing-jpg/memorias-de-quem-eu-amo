@@ -29,6 +29,7 @@ import { DigitalCardPage } from './components/DigitalCardPage';
 import { DigitalBookPage } from './components/DigitalBookPage';
 import { AuthModal } from './components/AuthModal';
 import { BuyCreditsModal } from './components/BuyCreditsModal';
+import { Toaster, toast } from 'sonner';
 import { VideoPlayer } from './components/VideoPlayer';
 import { PaywallCheckoutPage } from './components/PaywallCheckoutPage';
 import { fetchVideoJobRemote } from './lib/videoApi';
@@ -172,7 +173,7 @@ export default function App() {
 
   const handleStartCreation = () => {
     if (!user || !user.isPaidMember) {
-      alert('É necessário ser um membro pagante para criar homenagens. Escolha seu plano.');
+      toast.error('É necessário ser um membro pagante para criar homenagens. Escolha seu plano.');
       return;
     }
     setCurrentView('choose-type');
@@ -215,6 +216,7 @@ export default function App() {
   if (currentView === 'card' && activeVideo) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+        <Toaster theme={theme} position="top-center" richColors closeButton />
         <DigitalCardPage video={activeVideo} onGoHome={() => setCurrentView('home')} />
       </div>
     );
@@ -253,6 +255,7 @@ export default function App() {
   if (currentView === 'book-card' && activeBook) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+        <Toaster theme={theme} position="top-center" richColors closeButton />
         <DigitalBookPage book={activeBook} onGoHome={() => setCurrentView('home')} />
       </div>
     );
@@ -289,6 +292,8 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-amber-500 selection:text-black">
+      <Toaster theme={theme} position="top-center" richColors closeButton />
+
       {/* Global Navbar */}
       <header className="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-md border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">

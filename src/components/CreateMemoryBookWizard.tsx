@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { Sparkles, ArrowLeft, CheckCircle2, Loader2, X } from 'lucide-react';
 import { PhotoItem, MemoryBookJob, MemoryBookPage, User } from '../types';
 import { BOOK_PAGE_TEMPLATES } from '../data/bookTemplates';
 import { BookStepUploadPhotos, BookStepAssemblePages } from './MemoryBookSteps';
@@ -10,6 +11,7 @@ import { saveMemoryBookRemote, uploadMemoryBookMedia } from '../lib/bookApi';
 import { saveMemoryBookJob } from '../lib/credits';
 import { deductCreditRemote } from '../lib/authApi';
 import { PRESET_VOICES, PRESET_TRACKS } from '../data/presets';
+import { saveDraft, loadDraft, clearDraft } from '../lib/draftPersistence';
 
 interface CreateMemoryBookWizardProps {
   user: User;
@@ -30,13 +32,35 @@ function createEmptyPages(): MemoryBookPage[] {
 
 const STEP_LABELS = ['Fotos', 'Texto', 'Voz', 'Trilha', 'Montagem', 'Prévia'];
 
+const DRAFT_KEY = 'memorias_book_wizard_draft';
+
+interface BookWizardDraft {
+  currentStep: number;
+  photos: PhotoItem[];
+  fatherName: string;
+  authorName: string;
+  tributeText: string;
+  selectedVoiceId: string;
+  isCustomVoice: boolean;
+  customVoiceAudioUrl: string;
+  skipNarration: boolean;
+  selectedTrackId: string;
+  pages: MemoryBookPage[];
+}
+
 export const CreateMemoryBookWizard: React.FC<CreateMemoryBookWizardProps> = ({
   user,
   setUser,
   onFinish,
   onCancel,
 }) => {
-  const [currentStep, setCurrentStep] = useState<number>(1);
+  // Lido uma única vez, na montagem — protege contra perder o progresso se a aba fechar/travar
+  // no meio do preenchimento. Nunca restaura direto no Passo 6 (prévia): a esse ponto o crédito
+  // já foi gasto e o livro criado, então não faz sentido "continuar" um rascunho ali.
+  const [initialDraft] = useState<BookWizardDraft | null>(() => loadDraft<BookWizardDraft>(DRAFT_KEY));
+  const [showDraftBanner, setShowDraftBanner] = useState<boolean>(!!initialDraft);
+
+  const [currentStep, setCurrentStep] = useState<number>(Math.min(initialDraft?.currentStep || 1, 5));
 
   // Ao trocar de etapa (principalmente no celular), garante que a pessoa veja
   // o topo da nova etapa em vez de continuar na posição de rolagem da etapa anterior.
@@ -44,16 +68,16 @@ export const CreateMemoryBookWizard: React.FC<CreateMemoryBookWizardProps> = ({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentStep]);
 
-  const [photos, setPhotos] = useState<PhotoItem[]>([]);
-  const [fatherName, setFatherName] = useState<string>('');
-  const [authorName, setAuthorName] = useState<string>(user.name || '');
-  const [tributeText, setTributeText] = useState<string>('');
-  const [selectedVoiceId, setSelectedVoiceId] = useState<string>(PRESET_VOICES[0].id);
-  const [isCustomVoice, setIsCustomVoice] = useState<boolean>(false);
-  const [customVoiceAudioUrl, setCustomVoiceAudioUrl] = useState<string>('');
-  const [skipNarration, setSkipNarration] = useState<boolean>(false);
-  const [selectedTrackId, setSelectedTrackId] = useState<string>(PRESET_TRACKS[0].id);
-  const [pages, setPages] = useState<MemoryBookPage[]>(() => createEmptyPages());
+  const [photos, setPhotos] = useState<PhotoItem[]>(initialDraft?.photos || []);
+  const [fatherName, setFatherName] = useState<string>(initialDraft?.fatherName || '');
+  const [authorName, setAuthorName] = useState<string>(initialDraft?.authorName || user.name || '');
+  const [tributeText, setTributeText] = useState<string>(initialDraft?.tributeText || '');
+  const [selectedVoiceId, setSelectedVoiceId] = useState<string>(initialDraft?.selectedVoiceId || PRESET_VOICES[0].id);
+  const [isCustomVoice, setIsCustomVoice] = useState<boolean>(initialDraft?.isCustomVoice || false);
+  const [customVoiceAudioUrl, setCustomVoiceAudioUrl] = useState<string>(initialDraft?.customVoiceAudioUrl || '');
+  const [skipNarration, setSkipNarration] = useState<boolean>(initialDraft?.skipNarration || false);
+  const [selectedTrackId, setSelectedTrackId] = useState<string>(initialDraft?.selectedTrackId || PRESET_TRACKS[0].id);
+  const [pages, setPages] = useState<MemoryBookPage[]>(() => initialDraft?.pages || createEmptyPages());
 
   const [createdBook, setCreatedBook] = useState<MemoryBookJob | null>(null);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
@@ -61,9 +85,50 @@ export const CreateMemoryBookWizard: React.FC<CreateMemoryBookWizardProps> = ({
   const [isGeneratingJob, setIsGeneratingJob] = useState<boolean>(false);
   const [exportProgress, setExportProgress] = useState<string>('');
 
+  // Salva o rascunho (com debounce) a cada mudança relevante, enquanto ainda não chegou na
+  // prévia final — depois do Passo 6 o livro já existe de verdade, não faz mais sentido "rascunhar".
+  useEffect(() => {
+    if (currentStep >= 6) return;
+    const timer = setTimeout(() => {
+      saveDraft<BookWizardDraft>(DRAFT_KEY, {
+        currentStep,
+        photos,
+        fatherName,
+        authorName,
+        tributeText,
+        selectedVoiceId,
+        isCustomVoice,
+        customVoiceAudioUrl,
+        skipNarration,
+        selectedTrackId,
+        pages,
+      });
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [
+    currentStep, photos, fatherName, authorName, tributeText, selectedVoiceId,
+    isCustomVoice, customVoiceAudioUrl, skipNarration, selectedTrackId, pages,
+  ]);
+
+  const handleDiscardDraft = () => {
+    clearDraft(DRAFT_KEY);
+    setShowDraftBanner(false);
+    setCurrentStep(1);
+    setPhotos([]);
+    setFatherName('');
+    setAuthorName(user.name || '');
+    setTributeText('');
+    setSelectedVoiceId(PRESET_VOICES[0].id);
+    setIsCustomVoice(false);
+    setCustomVoiceAudioUrl('');
+    setSkipNarration(false);
+    setSelectedTrackId(PRESET_TRACKS[0].id);
+    setPages(createEmptyPages());
+  };
+
   const handleGenerateBook = async () => {
     if (user.credits < 1) {
-      alert('Você não tem créditos suficientes para criar um novo livro. Adicione créditos no seu painel.');
+      toast.error('Você não tem créditos suficientes para criar um novo livro. Adicione créditos no seu painel.');
       return;
     }
 
@@ -73,7 +138,7 @@ export const CreateMemoryBookWizard: React.FC<CreateMemoryBookWizardProps> = ({
     try {
       updatedUser = await deductCreditRemote(user.id, user.sessionToken || '');
     } catch (e: any) {
-      alert(e.message || 'Não foi possível criar o livro agora. Tente novamente.');
+      toast.error(e.message || 'Não foi possível criar o livro agora. Tente novamente.');
       setIsGeneratingJob(false);
       return;
     }
@@ -120,6 +185,7 @@ export const CreateMemoryBookWizard: React.FC<CreateMemoryBookWizardProps> = ({
       setCurrentStep(6);
       setIsGeneratingJob(false);
       setExportProgress('');
+      clearDraft(DRAFT_KEY);
 
       setIsSyncing(true);
       setSyncError('');
@@ -136,7 +202,7 @@ export const CreateMemoryBookWizard: React.FC<CreateMemoryBookWizardProps> = ({
       }
     } catch (e: any) {
       console.error('Erro ao montar o livro:', e);
-      alert(e.message || 'Não foi possível gerar o livro agora. Tente novamente.');
+      toast.error(e.message || 'Não foi possível gerar o livro agora. Tente novamente.');
       setIsGeneratingJob(false);
       setExportProgress('');
     }
@@ -159,6 +225,30 @@ export const CreateMemoryBookWizard: React.FC<CreateMemoryBookWizardProps> = ({
           <p className="text-xs text-slate-400">Passo {currentStep} de 6</p>
         </div>
       </div>
+
+      {/* Draft Recovery Banner */}
+      {showDraftBanner && (
+        <div className="flex items-center justify-between gap-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl px-4 py-3">
+          <p className="text-xs text-amber-200">
+            Continuando de onde você parou — recuperamos o progresso salvo automaticamente.
+          </p>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={handleDiscardDraft}
+              className="text-xs font-bold text-amber-300 hover:underline"
+            >
+              Começar do zero
+            </button>
+            <button
+              onClick={() => setShowDraftBanner(false)}
+              className="text-amber-400 hover:text-amber-200 p-1"
+              title="Fechar"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-6 gap-2">
         {STEP_LABELS.map((label, i) => {

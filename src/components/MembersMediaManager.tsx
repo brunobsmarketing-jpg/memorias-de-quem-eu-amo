@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { toast } from 'sonner';
 import {
   Upload,
   Mic,
@@ -11,6 +12,7 @@ import {
   CheckCircle2,
   Plus,
   Volume2,
+  AlertTriangle,
 } from 'lucide-react';
 import { MediaAsset } from '../types';
 import { getStoredMediaAssets, saveMediaAsset, deleteMediaAsset } from '../lib/credits';
@@ -137,7 +139,7 @@ export const MembersMediaManager: React.FC<MembersMediaManagerProps> = () => {
       }, 1000);
     } catch (err) {
       console.error(err);
-      alert('Não foi possível acessar a câmera/microfone. Verifique as permissões do seu navegador.');
+      toast.error('Não foi possível acessar a câmera/microfone. Verifique as permissões do seu navegador.');
     }
   };
 
@@ -149,9 +151,14 @@ export const MembersMediaManager: React.FC<MembersMediaManagerProps> = () => {
     }
   };
 
-  const handleDeleteMedia = (id: string) => {
-    const updated = deleteMediaAsset(id);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+
+  const confirmDeleteMedia = () => {
+    if (!pendingDeleteId) return;
+    const updated = deleteMediaAsset(pendingDeleteId);
     setMediaList(updated);
+    setPendingDeleteId(null);
+    toast.success('Excluído.');
   };
 
   const photos = mediaList.filter((m) => m.type === 'photo');
@@ -230,7 +237,7 @@ export const MembersMediaManager: React.FC<MembersMediaManagerProps> = () => {
                     <img src={photo.url} alt={photo.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                   </div>
                   <button
-                    onClick={() => handleDeleteMedia(photo.id)}
+                    onClick={() => setPendingDeleteId(photo.id)}
                     className="absolute top-2 right-2 p-1.5 bg-rose-500/80 hover:bg-rose-600 text-white rounded-lg text-xs backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity"
                     title="Excluir Foto"
                   >
@@ -329,7 +336,7 @@ export const MembersMediaManager: React.FC<MembersMediaManagerProps> = () => {
                         <span className="font-bold text-xs text-slate-200">{item.name}</span>
                       </div>
                       <button
-                        onClick={() => handleDeleteMedia(item.id)}
+                        onClick={() => setPendingDeleteId(item.id)}
                         className="text-slate-500 hover:text-rose-400 p-1"
                         title="Excluir"
                       >
@@ -346,6 +353,39 @@ export const MembersMediaManager: React.FC<MembersMediaManagerProps> = () => {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Confirmação antes de excluir — antes deletava direto no clique, sem chance de desfazer */}
+      {pendingDeleteId && (
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-sm w-full p-6 space-y-5 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-rose-500/10 text-rose-400 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-100">Excluir este arquivo?</h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Essa ação não pode ser desfeita. Se ele já estiver sendo usado em alguma homenagem, o vídeo/livro existente não é afetado.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setPendingDeleteId(null)}
+                className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm rounded-xl transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDeleteMedia}
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm rounded-xl transition-colors"
+              >
+                Excluir
+              </button>
+            </div>
           </div>
         </div>
       )}

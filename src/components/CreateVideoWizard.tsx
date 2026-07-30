@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { Sparkles, ArrowLeft, CheckCircle2, Loader2, X } from 'lucide-react';
 import { PhotoItem, VideoJob, User, CaptionStyle } from '../types';
 import {
   Step1UploadPhotos,
@@ -13,6 +14,7 @@ import { saveVideoJob } from '../lib/credits';
 import { uploadVideoJobMedia, saveVideoJobRemote } from '../lib/videoApi';
 import { deductCreditRemote } from '../lib/authApi';
 import { PRESET_VOICES, PRESET_TRACKS } from '../data/presets';
+import { saveDraft, loadDraft, clearDraft } from '../lib/draftPersistence';
 
 interface CreateVideoWizardProps {
   user: User;
@@ -21,13 +23,40 @@ interface CreateVideoWizardProps {
   onCancel: () => void;
 }
 
+const DRAFT_KEY = 'memorias_video_wizard_draft';
+
+interface VideoWizardDraft {
+  currentStep: number;
+  photos: PhotoItem[];
+  aiOnlyMode: boolean;
+  fatherName: string;
+  authorName: string;
+  tributeText: string;
+  selectedVoiceId: string;
+  isCustomVoice: boolean;
+  customVoiceAudioUrl: string;
+  skipNarration: boolean;
+  selectedTrackId: string;
+  useAIImages: boolean;
+  aiImages: { prompt: string; url: string }[];
+  selectedImageStyle: string;
+  memoryAge: string;
+  narratorGender: string;
+}
+
 export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
   user,
   setUser,
   onFinish,
   onCancel,
 }) => {
-  const [currentStep, setCurrentStep] = useState<number>(1);
+  // Lido uma única vez, na montagem — protege contra perder o progresso se a aba fechar/travar
+  // no meio do preenchimento. Nunca restaura direto no Passo 6 (prévia): a esse ponto o crédito
+  // já foi gasto e o job criado, então não faz sentido "continuar" um rascunho ali.
+  const [initialDraft] = useState<VideoWizardDraft | null>(() => loadDraft<VideoWizardDraft>(DRAFT_KEY));
+  const [showDraftBanner, setShowDraftBanner] = useState<boolean>(!!initialDraft);
+
+  const [currentStep, setCurrentStep] = useState<number>(Math.min(initialDraft?.currentStep || 1, 5));
 
   // Ao trocar de etapa (principalmente no celular), garante que a pessoa veja
   // o topo da nova etapa em vez de continuar na posição de rolagem da etapa anterior.
@@ -36,21 +65,73 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
   }, [currentStep]);
 
   // Form States
-  const [photos, setPhotos] = useState<PhotoItem[]>([]);
-  const [aiOnlyMode, setAiOnlyMode] = useState<boolean>(false);
-  const [fatherName, setFatherName] = useState<string>('');
-  const [authorName, setAuthorName] = useState<string>(user.name || '');
-  const [tributeText, setTributeText] = useState<string>('');
-  const [selectedVoiceId, setSelectedVoiceId] = useState<string>(PRESET_VOICES[0].id);
-  const [isCustomVoice, setIsCustomVoice] = useState<boolean>(false);
-  const [customVoiceAudioUrl, setCustomVoiceAudioUrl] = useState<string>('');
-  const [skipNarration, setSkipNarration] = useState<boolean>(false);
-  const [selectedTrackId, setSelectedTrackId] = useState<string>(PRESET_TRACKS[0].id);
-  const [useAIImages, setUseAIImages] = useState<boolean>(false);
-  const [aiImages, setAiImages] = useState<{ prompt: string; url: string }[]>([]);
-  const [selectedImageStyle, setSelectedImageStyle] = useState<string>('watercolor');
-  const [memoryAge, setMemoryAge] = useState<string>('auto');
-  const [narratorGender, setNarratorGender] = useState<string>('auto');
+  const [photos, setPhotos] = useState<PhotoItem[]>(initialDraft?.photos || []);
+  const [aiOnlyMode, setAiOnlyMode] = useState<boolean>(initialDraft?.aiOnlyMode || false);
+  const [fatherName, setFatherName] = useState<string>(initialDraft?.fatherName || '');
+  const [authorName, setAuthorName] = useState<string>(initialDraft?.authorName || user.name || '');
+  const [tributeText, setTributeText] = useState<string>(initialDraft?.tributeText || '');
+  const [selectedVoiceId, setSelectedVoiceId] = useState<string>(initialDraft?.selectedVoiceId || PRESET_VOICES[0].id);
+  const [isCustomVoice, setIsCustomVoice] = useState<boolean>(initialDraft?.isCustomVoice || false);
+  const [customVoiceAudioUrl, setCustomVoiceAudioUrl] = useState<string>(initialDraft?.customVoiceAudioUrl || '');
+  const [skipNarration, setSkipNarration] = useState<boolean>(initialDraft?.skipNarration || false);
+  const [selectedTrackId, setSelectedTrackId] = useState<string>(initialDraft?.selectedTrackId || PRESET_TRACKS[0].id);
+  const [useAIImages, setUseAIImages] = useState<boolean>(initialDraft?.useAIImages || false);
+  const [aiImages, setAiImages] = useState<{ prompt: string; url: string }[]>(initialDraft?.aiImages || []);
+  const [selectedImageStyle, setSelectedImageStyle] = useState<string>(initialDraft?.selectedImageStyle || 'watercolor');
+  const [memoryAge, setMemoryAge] = useState<string>(initialDraft?.memoryAge || 'auto');
+  const [narratorGender, setNarratorGender] = useState<string>(initialDraft?.narratorGender || 'auto');
+
+  // Salva o rascunho (com debounce) a cada mudança relevante, enquanto ainda não chegou na
+  // prévia final — depois do Passo 6 o job já existe de verdade, não faz mais sentido "rascunhar".
+  useEffect(() => {
+    if (currentStep >= 6) return;
+    const timer = setTimeout(() => {
+      saveDraft<VideoWizardDraft>(DRAFT_KEY, {
+        currentStep,
+        photos,
+        aiOnlyMode,
+        fatherName,
+        authorName,
+        tributeText,
+        selectedVoiceId,
+        isCustomVoice,
+        customVoiceAudioUrl,
+        skipNarration,
+        selectedTrackId,
+        useAIImages,
+        aiImages,
+        selectedImageStyle,
+        memoryAge,
+        narratorGender,
+      });
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [
+    currentStep, photos, aiOnlyMode, fatherName, authorName, tributeText, selectedVoiceId,
+    isCustomVoice, customVoiceAudioUrl, skipNarration, selectedTrackId, useAIImages, aiImages,
+    selectedImageStyle, memoryAge, narratorGender,
+  ]);
+
+  const handleDiscardDraft = () => {
+    clearDraft(DRAFT_KEY);
+    setShowDraftBanner(false);
+    setCurrentStep(1);
+    setPhotos([]);
+    setAiOnlyMode(false);
+    setFatherName('');
+    setAuthorName(user.name || '');
+    setTributeText('');
+    setSelectedVoiceId(PRESET_VOICES[0].id);
+    setIsCustomVoice(false);
+    setCustomVoiceAudioUrl('');
+    setSkipNarration(false);
+    setSelectedTrackId(PRESET_TRACKS[0].id);
+    setUseAIImages(false);
+    setAiImages([]);
+    setSelectedImageStyle('watercolor');
+    setMemoryAge('auto');
+    setNarratorGender('auto');
+  };
 
   // Created Draft Job
   const [createdJob, setCreatedJob] = useState<VideoJob | null>(null);
@@ -61,7 +142,7 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
 
   const handleGeneratePreviewJob = async () => {
     if (user.credits < 1) {
-      alert('Você não tem créditos suficientes para criar um novo vídeo. Adicione créditos no seu painel.');
+      toast.error('Você não tem créditos suficientes para criar um novo vídeo. Adicione créditos no seu painel.');
       return;
     }
 
@@ -73,7 +154,7 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
     try {
       updatedUser = await deductCreditRemote(user.id, user.sessionToken || '');
     } catch (e: any) {
-      alert(e.message || 'Não foi possível criar o vídeo agora. Tente novamente.');
+      toast.error(e.message || 'Não foi possível criar o vídeo agora. Tente novamente.');
       setIsGeneratingJob(false);
       return;
     }
@@ -116,6 +197,7 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
     setCreatedJob(newJob);
     setCurrentStep(6);
     setIsGeneratingJob(false);
+    clearDraft(DRAFT_KEY);
 
     // Envia as mídias para o Supabase e salva o registro central, para o cartão
     // digital funcionar em qualquer dispositivo (não só no navegador de quem criou).
@@ -152,6 +234,30 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
           <p className="text-xs text-slate-400">Passo {currentStep} de 6</p>
         </div>
       </div>
+
+      {/* Draft Recovery Banner */}
+      {showDraftBanner && (
+        <div className="flex items-center justify-between gap-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl px-4 py-3">
+          <p className="text-xs text-amber-200">
+            Continuando de onde você parou — recuperamos o progresso salvo automaticamente.
+          </p>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={handleDiscardDraft}
+              className="text-xs font-bold text-amber-300 hover:underline"
+            >
+              Começar do zero
+            </button>
+            <button
+              onClick={() => setShowDraftBanner(false)}
+              className="text-amber-400 hover:text-amber-200 p-1"
+              title="Fechar"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Stepper Progress Bar */}
       <div className="grid grid-cols-6 gap-2">

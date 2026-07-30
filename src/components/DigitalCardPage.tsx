@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { toast } from 'sonner';
 import { Heart, QrCode, Download, Sparkles, ExternalLink, Share2, Check, Loader2 } from 'lucide-react';
 import { VideoJob } from '../types';
 import { VideoPlayer } from './VideoPlayer';
@@ -27,7 +28,10 @@ export const DigitalCardPage: React.FC<DigitalCardPageProps> = ({ video, onGoHom
       setTimeout(() => setCopied(false), 2000);
     } catch (e) {
       console.error('Falha ao copiar o link:', e);
-      alert(`Não foi possível copiar automaticamente. Copie o link manualmente:\n\n${video.cardUrl}`);
+      toast.error('Não foi possível copiar automaticamente. Copie o link manualmente:', {
+        description: video.cardUrl,
+        duration: 10000,
+      });
     }
   };
 
@@ -144,7 +148,7 @@ export const DigitalCardPage: React.FC<DigitalCardPageProps> = ({ video, onGoHom
       link.click();
     } catch (e: any) {
       console.error('Erro ao gerar cartão imprimível:', e);
-      alert('Não foi possível gerar o cartão imprimível agora. Tente novamente.');
+      toast.error('Não foi possível gerar o cartão imprimível agora. Tente novamente.');
     } finally {
       setIsGeneratingCard(false);
     }

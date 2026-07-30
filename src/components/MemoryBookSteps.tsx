@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { Upload, Trash2, Loader2, BookImage, CheckCircle2, MousePointerClick } from 'lucide-react';
 import { PhotoItem, MemoryBookPage, PageTemplateDef } from '../types';
 import { BOOK_PAGE_TEMPLATES } from '../data/bookTemplates';
@@ -34,10 +35,9 @@ export const BookStepUploadPhotos: React.FC<BookStepUploadPhotosProps> = ({ phot
     const validFiles = files.filter((f) => f.size <= MAX_UPLOAD_FILE_SIZE_BYTES);
 
     if (oversized.length > 0) {
-      alert(
-        `${oversized.length} foto(s) acima de ${formatFileSizeMB(MAX_UPLOAD_FILE_SIZE_BYTES)}MB foram ignoradas: ` +
-        oversized.map((f) => `${f.name} (${formatFileSizeMB(f.size)}MB)`).join(', ')
-      );
+      toast.warning(`${oversized.length} foto(s) acima de ${formatFileSizeMB(MAX_UPLOAD_FILE_SIZE_BYTES)}MB foram ignoradas`, {
+        description: oversized.map((f) => `${f.name} (${formatFileSizeMB(f.size)}MB)`).join(', '),
+      });
     }
 
     setIsProcessingPhotos(true);
@@ -52,7 +52,7 @@ export const BookStepUploadPhotos: React.FC<BookStepUploadPhotosProps> = ({ phot
           ]);
         } catch (err) {
           console.error(`Falha ao processar a foto ${file.name}:`, err);
-          alert(`Não foi possível processar a foto "${file.name}". Tente outra imagem.`);
+          toast.error(`Não foi possível processar a foto "${file.name}". Tente outra imagem.`);
         }
       }
     } finally {

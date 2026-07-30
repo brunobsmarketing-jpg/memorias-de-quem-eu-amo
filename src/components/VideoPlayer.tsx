@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { Play, Pause, RotateCcw, Volume2, VolumeX, Download, CheckCircle2 } from 'lucide-react';
 import { VideoJob, CaptionStyle } from '../types';
 import { drawVideoFrame, getAllSlides } from '../lib/video';
@@ -333,7 +334,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaption
       URL.revokeObjectURL(blobUrl);
     } catch (e: any) {
       console.error(e);
-      alert('Erro ao gerar o vídeo em MP4: ' + e.message);
+      toast.error('Erro ao gerar o vídeo em MP4: ' + e.message);
     } finally {
       setIsRecordingExport(false);
       setRenderStatusLabel('');

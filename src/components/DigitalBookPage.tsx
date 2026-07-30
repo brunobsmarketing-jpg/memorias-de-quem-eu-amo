@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { Heart, QrCode, Share2, Check, Sparkles } from 'lucide-react';
 import { MemoryBookJob } from '../types';
 import { BookVideoPlayer } from './BookVideoPlayer';
@@ -24,7 +25,10 @@ export const DigitalBookPage: React.FC<DigitalBookPageProps> = ({ book, onGoHome
       setTimeout(() => setCopied(false), 2000);
     } catch (e) {
       console.error('Falha ao copiar o link:', e);
-      alert(`Não foi possível copiar automaticamente. Copie o link manualmente:\n\n${book.cardUrl}`);
+      toast.error('Não foi possível copiar automaticamente. Copie o link manualmente:', {
+        description: book.cardUrl,
+        duration: 10000,
+      });
     }
   };
 

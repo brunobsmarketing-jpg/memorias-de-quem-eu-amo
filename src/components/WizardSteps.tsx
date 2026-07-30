@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { toast } from 'sonner';
 import {
   Upload,
   Trash2,
@@ -55,10 +56,9 @@ export const Step1UploadPhotos: React.FC<Step1UploadProps> = ({ photos, setPhoto
     const validFiles = files.filter((f) => f.size <= MAX_UPLOAD_FILE_SIZE_BYTES);
 
     if (oversized.length > 0) {
-      alert(
-        `${oversized.length} foto(s) acima de ${formatFileSizeMB(MAX_UPLOAD_FILE_SIZE_BYTES)}MB foram ignoradas: ` +
-        oversized.map((f) => `${f.name} (${formatFileSizeMB(f.size)}MB)`).join(', ')
-      );
+      toast.warning(`${oversized.length} foto(s) acima de ${formatFileSizeMB(MAX_UPLOAD_FILE_SIZE_BYTES)}MB foram ignoradas`, {
+        description: oversized.map((f) => `${f.name} (${formatFileSizeMB(f.size)}MB)`).join(', '),
+      });
     }
 
     setIsProcessingPhotos(true);
@@ -78,7 +78,7 @@ export const Step1UploadPhotos: React.FC<Step1UploadProps> = ({ photos, setPhoto
           ]);
         } catch (err) {
           console.error(`Falha ao processar a foto ${file.name}:`, err);
-          alert(`Não foi possível processar a foto "${file.name}". Tente outra imagem.`);
+          toast.error(`Não foi possível processar a foto "${file.name}". Tente outra imagem.`);
         }
       }
     } finally {
@@ -289,7 +289,7 @@ export const Step2TextTribute: React.FC<Step2TextProps> = ({
 
   const handleGenerateAI = async () => {
     if (!fatherName) {
-      alert('Por favor, informe o nome do seu pai.');
+      toast.error('Por favor, informe o nome do seu pai.');
       return;
     }
     setIsGenerating(true);
@@ -303,7 +303,7 @@ export const Step2TextTribute: React.FC<Step2TextProps> = ({
       });
       setTributeText(generated);
     } catch (err: any) {
-      alert('Não foi possível gerar o texto via IA: ' + err.message);
+      toast.error('Não foi possível gerar o texto via IA: ' + err.message);
     } finally {
       setIsGenerating(false);
     }
@@ -530,7 +530,7 @@ export const Step3NarrationVoice: React.FC<Step3VoiceProps> = ({
       }, 1000);
       (window as any)._recTimer = timer;
     } catch (e) {
-      alert('Erro ao acessar o microfone. Verifique as permissões do seu navegador.');
+      toast.error('Erro ao acessar o microfone. Verifique as permissões do seu navegador.');
     }
   };
 
@@ -542,7 +542,7 @@ export const Step3NarrationVoice: React.FC<Step3VoiceProps> = ({
       setCustomVoiceAudioUrl(rec.audioDataUrl);
       setIsCustomVoice(true);
     } catch (e) {
-      alert('Erro ao salvar gravação de áudio.');
+      toast.error('Erro ao salvar gravação de áudio.');
     }
   };
 
@@ -553,7 +553,7 @@ export const Step3NarrationVoice: React.FC<Step3VoiceProps> = ({
       setPreviewAudioUrl(url);
       setCustomVoiceAudioUrl(url);
     } catch (e) {
-      alert('Erro ao gerar prévia da narração.');
+      toast.error('Erro ao gerar prévia da narração.');
     } finally {
       setIsGeneratingTTS(false);
     }
@@ -567,7 +567,7 @@ export const Step3NarrationVoice: React.FC<Step3VoiceProps> = ({
       setCustomVoiceAudioUrl(clonedAudio);
       setPreviewAudioUrl(clonedAudio);
     } catch (e: any) {
-      alert('Erro na clonagem de voz: ' + e.message);
+      toast.error('Erro na clonagem de voz: ' + e.message);
     } finally {
       setIsCloningVoice(false);
     }

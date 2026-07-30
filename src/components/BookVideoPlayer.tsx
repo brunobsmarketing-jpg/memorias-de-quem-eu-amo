@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { Play, Pause, Volume2, VolumeX, Download, CheckCircle2 } from 'lucide-react';
 import { MemoryBookJob } from '../types';
 import { PRESET_TRACKS } from '../data/presets';
@@ -113,7 +114,7 @@ export const BookVideoPlayer: React.FC<BookVideoPlayerProps> = ({ book }) => {
       setVideoUrl(mp4Url);
     } catch (e: any) {
       console.error(e);
-      alert('Erro ao gerar o vídeo em MP4: ' + e.message);
+      toast.error('Erro ao gerar o vídeo em MP4: ' + e.message);
     } finally {
       setIsRecordingExport(false);
       setRenderStatusLabel('');
