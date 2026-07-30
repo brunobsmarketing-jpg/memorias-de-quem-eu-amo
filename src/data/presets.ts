@@ -227,27 +227,27 @@ export const PRESET_TRACKS: PresetTrack[] = [
 
 export const CREDIT_PACKAGES: CreditPackage[] = [
   {
-    id: 'pkg-1',
-    credits: 1,
-    priceBRL: 19.90,
-    priceFormatted: 'R$ 19,90',
-    description: '1 Vídeo HD Sem Marca d\'Água + Cartão Digital + QR Code',
-  },
-  {
     id: 'pkg-3',
     credits: 3,
-    priceBRL: 39.90,
-    priceFormatted: 'R$ 39,90',
-    popular: true,
-    description: '3 Vídeos HD (Apenas R$ 13,30 por vídeo) + Cartões Digitais',
+    priceBRL: 19.90,
+    priceFormatted: 'R$ 19,90',
+    description: '3 Vídeos HD (Apenas R$ 6,63 por vídeo) + Cartões Digitais',
   },
   {
     id: 'pkg-5',
     credits: 5,
-    priceBRL: 54.90,
-    priceFormatted: 'R$ 54,90',
+    priceBRL: 24.90,
+    priceFormatted: 'R$ 24,90',
+    popular: true,
+    description: '5 Vídeos HD (Apenas R$ 4,98 por vídeo) + Cartões Digitais',
+  },
+  {
+    id: 'pkg-10',
+    credits: 10,
+    priceBRL: 39.90,
+    priceFormatted: 'R$ 39,90',
     bestValue: true,
-    description: '5 Vídeos HD (Apenas R$ 10,98 por vídeo) — Ideal para dar aos pais, avôs e tios',
+    description: '10 Vídeos HD (Apenas R$ 3,99 por vídeo) — Ideal para dar aos pais, avôs e tios',
   },
 ];
 
