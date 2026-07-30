@@ -592,8 +592,8 @@ async function revokeInitialAccessByEmail(email: string, reason: string) {
 // Webhook (postback) da Payt — usado só pra compra inicial (virar membro pago), feita numa
 // página de vendas fora deste app. Autenticado por um token secreto na própria URL (configurado
 // no painel da Payt), já que a Payt não documenta um esquema de assinatura HMAC como a Mercado
-// Pago. FORMATO AINDA NÃO CONFIRMADO: registra o payload bruto no log pra descobrirmos o formato
-// real assim que o primeiro evento de teste chegar (ver src/lib/paytCatalog.ts).
+// Pago. Formato confirmado com uma venda PIX real de teste em 2026-07-30 (ver comentários abaixo
+// nos pontos onde os nomes de campo divergiam do que a documentação de outros gateways sugeria).
 app.post('/api/webhook/payt/:token', webhookLimiter, async (req, res) => {
   if (!isPaytWebhookConfigured()) {
     console.error('Webhook Payt recebido, mas PAYT_WEBHOOK_SECRET não está configurado — recusando.');
@@ -619,9 +619,14 @@ app.post('/api/webhook/payt/:token', webhookLimiter, async (req, res) => {
       return;
     }
 
-    const isApproved = /aprovad|finalizad|approved|completed/.test(eventStatus);
+    // "paid" é o status real confirmado numa venda PIX de teste (payload.status = "paid") — bem
+    // diferente do que a documentação/UI em português da Payt sugeria ("Finalizada/Aprovada").
+    const isApproved = eventStatus === 'paid' || /aprovad|finalizad|approved|completed/.test(eventStatus);
     // Cobre os eventos de "Cancelada - Chargeback", "Cancelada - Reembolsada" e
     // "Solicitação de Reembolso" — qualquer um deles bloqueia o acesso imediatamente.
+    // OBS: o valor real do status "Cancelada" (evento também marcado no painel) ainda não foi
+    // confirmado por nenhum evento de teste — enquanto não soubermos o valor exato, ele cai no
+    // "ignorado" abaixo (não libera nem revoga nada), que é o comportamento seguro por padrão.
     const isRevoked = /reembols|chargeback|estorn|refund|dispute/.test(eventStatus);
 
     if (isRevoked) {
@@ -636,11 +641,15 @@ app.post('/api/webhook/payt/:token', webhookLimiter, async (req, res) => {
     }
 
     const name = payload.name || payload.customer?.name || payload.buyer?.name;
-    const productId = String(payload.productId || payload.offerId || payload.product?.id || '');
-    const amountBRL = payload.amount || payload.total || payload.price;
-    const externalId = payload.id || payload.transactionId || payload.orderId || payload.saleId
-      ? `payt:${payload.id || payload.transactionId || payload.orderId || payload.saleId}`
-      : undefined;
+    // product.code (ex: "LGA6NY") é o identificador real confirmado — product.id não existe no
+    // payload da Payt (fica como fallback só por precaução, caso o formato mude no futuro).
+    const productId = String(payload.productId || payload.offerId || payload.product?.code || payload.product?.id || '');
+    // Valor vem em centavos (ex: 500 = R$ 5,00) — mesma convenção de Stripe/Mercado Pago.
+    const rawAmount = payload.transaction?.total_price ?? payload.product?.price ?? payload.amount ?? payload.total ?? payload.price;
+    const amountBRL = typeof rawAmount === 'number' ? rawAmount / 100 : undefined;
+    // transaction_id (snake_case) é o campo real confirmado — os demais ficam como fallback.
+    const rawExternalId = payload.transaction_id || payload.id || payload.transactionId || payload.orderId || payload.saleId;
+    const externalId = rawExternalId ? `payt:${rawExternalId}` : undefined;
 
     const product = getPaytProductById(productId);
     if (!product) {

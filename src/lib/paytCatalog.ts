@@ -4,20 +4,20 @@ export interface PaytProductDef {
 }
 
 /**
- * Mapa productId/offerId da Payt -> quantidade de créditos liberados no primeiro acesso.
+ * Mapa product.code da Payt -> quantidade de créditos liberados no primeiro acesso.
  * A Payt é usada só para a COMPRA INICIAL (virar membro pago) — compras adicionais de créditos
  * acontecem pela Mercado Pago (ver src/lib/creditCatalog.ts).
  *
- * Os IDs abaixo são placeholders: ninguém sabe ainda o productId/offerId real que a Payt manda
- * no payload do webhook, porque nenhum evento de teste foi recebido até agora. Substitua a
- * chave 'PLACEHOLDER_ACESSO_INICIAL' pelo ID real assim que o primeiro evento chegar (o payload
- * bruto é logado no console do servidor em /api/webhook/payt/:token justamente pra isso).
+ * 'LGA6NY' = "Memora - Aplicativo Celebração Dia dos Pais", confirmado numa venda PIX real de
+ * teste em 2026-07-30 (R$ 5,00 na ocasião — o preço na Payt ainda será ajustado para R$ 29,90
+ * pela oferta real de 5 créditos, mas o código do produto continua o mesmo).
  *
- * Enquanto o ID real não é conhecido, o webhook falha fechado: não libera crédito nenhum pra um
- * productId não mapeado, só registra um erro claro no log em vez de chutar uma quantidade.
+ * Enquanto um product.code não estiver mapeado aqui, o webhook falha fechado: não libera crédito
+ * nenhum pra um produto desconhecido, só registra um erro claro no log em vez de chutar uma
+ * quantidade — importante se um novo produto/oferta for criado na Payt no futuro.
  */
 export const PAYT_PRODUCT_CATALOG: Record<string, PaytProductDef> = {
-  PLACEHOLDER_ACESSO_INICIAL: { credits: 1, packageId: 'payt-acesso-inicial' },
+  LGA6NY: { credits: 5, packageId: 'payt-5-creditos' },
 };
 
 export function getPaytProductById(productId: string): PaytProductDef | undefined {
