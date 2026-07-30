@@ -296,32 +296,32 @@ export default function App() {
 
       {/* Global Navbar */}
       <header className="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-md border-b border-slate-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 min-h-16 py-2 flex items-center justify-between gap-2">
           {/* Logo Branding */}
           <div
             onClick={() => setCurrentView('home')}
-            className="flex items-center gap-2.5 cursor-pointer group"
+            className="flex items-center gap-2 sm:gap-2.5 cursor-pointer group min-w-0"
           >
             <img
               src="/logo-icon.png"
               alt="Memora"
-              className="w-9 h-9 rounded-xl shadow-md group-hover:scale-105 transition-transform"
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl shadow-md group-hover:scale-105 transition-transform flex-shrink-0"
             />
-            <div>
-              <span className="font-extrabold text-base tracking-tight text-slate-100 block group-hover:text-amber-400 transition-colors">
+            <div className="min-w-0">
+              <span className="font-extrabold text-sm sm:text-base tracking-tight text-slate-100 block group-hover:text-amber-400 transition-colors truncate">
                 Memora
               </span>
-              <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider block">
+              <span className="hidden sm:block text-[10px] text-amber-400 font-bold uppercase tracking-wider truncate">
                 {user?.isPaidMember ? 'Área de Membros VIP' : 'Acesso Exclusivo para Assinantes'}
               </span>
             </div>
           </div>
 
           {/* User Status / Actions */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
             <button
               onClick={toggleTheme}
-              className="p-2 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-xl border border-slate-800 transition-colors"
+              className="p-2 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-xl border border-slate-800 transition-colors flex-shrink-0"
               title={theme === 'dark' ? 'Mudar para modo claro' : 'Mudar para modo escuro'}
             >
               {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
@@ -342,22 +342,22 @@ export default function App() {
 
                 <button
                   onClick={() => setShowBuyCreditsModal(true)}
-                  className="sm:hidden p-2 bg-slate-900 hover:bg-slate-800 text-amber-400 rounded-xl border border-slate-800 transition-colors"
+                  className="sm:hidden flex items-center gap-1 px-2 py-2 bg-slate-900 text-amber-400 rounded-xl border border-slate-800 transition-colors text-xs font-bold"
                   title="Adicionar Créditos"
                 >
-                  <Zap className="w-4 h-4" />
+                  <Zap className="w-4 h-4" /> {user.credits}
                 </button>
 
                 <button
                   onClick={handleStartCreation}
-                  className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-extrabold text-xs rounded-xl shadow-md transition-transform active:scale-95 flex items-center gap-1.5"
+                  className="px-2.5 sm:px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-extrabold text-xs rounded-xl shadow-md transition-transform active:scale-95 flex items-center gap-1 sm:gap-1.5 flex-shrink-0"
                 >
-                  <PlusCircle className="w-4 h-4" /> Criar Homenagem
+                  <PlusCircle className="w-4 h-4 flex-shrink-0" /> <span className="hidden sm:inline">Criar Homenagem</span><span className="sm:hidden">Criar</span>
                 </button>
 
                 <button
                   onClick={handleLogout}
-                  className="p-2 bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded-xl border border-slate-800 transition-colors flex items-center gap-1 text-xs"
+                  className="p-2 bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded-xl border border-slate-800 transition-colors flex items-center gap-1 text-xs flex-shrink-0"
                   title="Sair da Conta"
                 >
                   <LogOut className="w-4 h-4" /> <span className="hidden sm:inline">Sair</span>
@@ -366,9 +366,9 @@ export default function App() {
             ) : (
               <button
                 onClick={() => setShowAuthModal(true)}
-                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-amber-400 border border-amber-500/30 font-bold text-xs rounded-xl transition-colors flex items-center gap-1.5"
+                className="px-2.5 sm:px-4 py-2 bg-slate-900 hover:bg-slate-800 text-amber-400 border border-amber-500/30 font-bold text-xs rounded-xl transition-colors flex items-center gap-1 sm:gap-1.5 flex-shrink-0 whitespace-nowrap"
               >
-                <UserCheck className="w-4 h-4" /> Já é Membro? Entrar
+                <UserCheck className="w-4 h-4 flex-shrink-0" /> <span className="hidden sm:inline">Já é Membro? </span>Entrar
               </button>
             )}
           </div>

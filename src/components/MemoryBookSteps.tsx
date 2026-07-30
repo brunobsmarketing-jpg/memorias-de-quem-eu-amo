@@ -135,11 +135,11 @@ export const BookStepUploadPhotos: React.FC<BookStepUploadPhotosProps> = ({ phot
         </p>
       )}
 
-      <div className="flex justify-end pt-4">
+      <div className="flex pt-4">
         <button
           onClick={onNext}
           disabled={photos.length < MIN_BOOK_PHOTOS}
-          className="px-6 py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed text-black font-bold rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-2"
+          className="w-full sm:w-auto sm:ml-auto justify-center px-6 py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed text-black font-bold rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-2"
         >
           Próximo Passo: Texto da Homenagem ({photos.length}/{MIN_BOOK_PHOTOS} fotos)
         </button>
@@ -346,17 +346,17 @@ export const BookStepAssemblePages: React.FC<BookStepAssemblePagesProps> = ({
         </p>
       )}
 
-      <div className="flex items-center justify-between pt-4">
+      <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 pt-4">
         <button
           onClick={onBack}
-          className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-sm rounded-xl border border-slate-700"
+          className="w-full sm:w-auto justify-center px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-sm rounded-xl border border-slate-700 flex items-center"
         >
           Voltar
         </button>
         <button
           onClick={onNext}
           disabled={totalSlotsFilled === 0}
-          className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-50 text-black font-bold rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-2"
+          className="w-full sm:w-auto justify-center px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-50 text-black font-bold rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-2"
         >
           Gerar Livro em Vídeo
         </button>

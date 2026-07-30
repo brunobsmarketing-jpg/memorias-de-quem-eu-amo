@@ -242,11 +242,11 @@ export const Step1UploadPhotos: React.FC<Step1UploadProps> = ({ photos, setPhoto
       )}
 
       {/* Next Step */}
-      <div className="flex justify-end pt-4">
+      <div className="flex pt-4">
         <button
           onClick={onNext}
           disabled={!aiOnlyMode && photos.length < 3}
-          className="px-6 py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed text-black font-bold rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-2"
+          className="w-full sm:w-auto sm:ml-auto justify-center px-6 py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed text-black font-bold rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-2"
         >
           {aiOnlyMode
             ? 'Próximo Passo: Texto da Homenagem'
@@ -466,17 +466,17 @@ export const Step2TextTribute: React.FC<Step2TextProps> = ({
         </p>
       )}
 
-      <div className="flex items-center justify-between pt-4">
+      <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 pt-4">
         <button
           onClick={onBack}
-          className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-sm rounded-xl border border-slate-700"
+          className="w-full sm:w-auto justify-center px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-sm rounded-xl border border-slate-700 flex items-center"
         >
           Voltar
         </button>
         <button
           onClick={onNext}
           disabled={!fatherName || !tributeText.trim()}
-          className="px-6 py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-black font-bold rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-2"
+          className="w-full sm:w-auto justify-center px-6 py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-black font-bold rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-2"
         >
           Próximo Passo: Escolher Narração
         </button>
@@ -789,10 +789,10 @@ export const Step3NarrationVoice: React.FC<Step3VoiceProps> = ({
         );
       })()}
 
-      <div className="flex items-center justify-between pt-4">
+      <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 pt-4">
         <button
           onClick={onBack}
-          className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-sm rounded-xl border border-slate-700"
+          className="w-full sm:w-auto justify-center px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-sm rounded-xl border border-slate-700 flex items-center"
         >
           Voltar
         </button>
@@ -803,7 +803,7 @@ export const Step3NarrationVoice: React.FC<Step3VoiceProps> = ({
             ((!isCustomVoice && (isGeneratingTTS || !customVoiceAudioUrl)) ||
               (isCustomVoice && (isCloningVoice || !customVoiceAudioUrl)))
           }
-          className="px-6 py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-black font-bold rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-2"
+          className="w-full sm:w-auto justify-center px-6 py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-black font-bold rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-2"
         >
           Próximo Passo: Trilha Sonora
         </button>
@@ -898,16 +898,16 @@ export const Step4MusicTrack: React.FC<Step4MusicProps> = ({
         ))}
       </div>
 
-      <div className="flex items-center justify-between pt-4">
+      <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 pt-4">
         <button
           onClick={onBack}
-          className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-sm rounded-xl border border-slate-700"
+          className="w-full sm:w-auto justify-center px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-sm rounded-xl border border-slate-700 flex items-center"
         >
           Voltar
         </button>
         <button
           onClick={onNext}
-          className="px-6 py-3 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-2"
+          className="w-full sm:w-auto justify-center px-6 py-3 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-2"
         >
           Próximo Passo: Imagens Ilustrativas IA
         </button>
@@ -1197,17 +1197,17 @@ export const Step5AIImagesOption: React.FC<Step5AIImagesProps> = ({
         </p>
       )}
 
-      <div className="flex items-center justify-between pt-4">
+      <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 pt-4">
         <button
           onClick={onBack}
-          className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-sm rounded-xl border border-slate-700"
+          className="w-full sm:w-auto justify-center px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-sm rounded-xl border border-slate-700 flex items-center"
         >
           Voltar
         </button>
         <button
           onClick={onNext}
           disabled={isSubmitting || !canProceed}
-          className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-50 text-black font-bold rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-2"
+          className="w-full sm:w-auto justify-center px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-50 text-black font-bold rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-2"
         >
           {isSubmitting ? (
             <>

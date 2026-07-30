@@ -131,45 +131,51 @@ export const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       {/* Navigation Tabs for Workspace */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
+      <div className="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-center gap-2 border-b border-slate-800 pb-2">
         <button
           onClick={() => setActiveSection('videos')}
-          className={`px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
+          className={`px-3 sm:px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center sm:justify-start gap-2 text-center ${
             activeSection === 'videos'
               ? 'bg-amber-500 text-black shadow-md'
               : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
           }`}
         >
-          <Film className="w-4 h-4" /> Minhas Homenagens Criadas ({videos.length})
+          <Film className="w-4 h-4 flex-shrink-0" />
+          <span className="sm:hidden">Homenagens ({videos.length})</span>
+          <span className="hidden sm:inline">Minhas Homenagens Criadas ({videos.length})</span>
         </button>
 
         <button
           onClick={() => setActiveSection('books')}
-          className={`px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
+          className={`px-3 sm:px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center sm:justify-start gap-2 text-center ${
             activeSection === 'books'
               ? 'bg-amber-500 text-black shadow-md'
               : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
           }`}
         >
-          <BookImage className="w-4 h-4" /> Meus Livros de Memórias ({books.length})
+          <BookImage className="w-4 h-4 flex-shrink-0" />
+          <span className="sm:hidden">Livros ({books.length})</span>
+          <span className="hidden sm:inline">Meus Livros de Memórias ({books.length})</span>
         </button>
 
         <button
           onClick={() => setActiveSection('media')}
-          className={`px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
+          className={`px-3 sm:px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center sm:justify-start gap-2 text-center ${
             activeSection === 'media'
               ? 'bg-amber-500 text-black shadow-md'
               : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
           }`}
         >
-          <Upload className="w-4 h-4" /> Enviar Arquivos & Gravador de Voz
+          <Upload className="w-4 h-4 flex-shrink-0" />
+          <span className="sm:hidden">Arquivos & Voz</span>
+          <span className="hidden sm:inline">Enviar Arquivos & Gravador de Voz</span>
         </button>
 
         <button
           onClick={onOpenBuyCredits}
-          className="px-4 py-2.5 rounded-xl font-bold text-xs bg-slate-900 text-amber-400 hover:bg-slate-800 border border-amber-500/30 transition-all flex items-center gap-1.5 ml-auto"
+          className="px-3 sm:px-4 py-2.5 rounded-xl font-bold text-xs bg-slate-900 text-amber-400 hover:bg-slate-800 border border-amber-500/30 transition-all flex items-center justify-center sm:justify-start gap-1.5 sm:ml-auto"
         >
-          <Zap className="w-4 h-4" /> Adicionar Créditos
+          <Zap className="w-4 h-4 flex-shrink-0" /> Adicionar Créditos
         </button>
       </div>
 

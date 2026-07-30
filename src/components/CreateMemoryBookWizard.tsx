@@ -218,9 +218,10 @@ export const CreateMemoryBookWizard: React.FC<CreateMemoryBookWizardProps> = ({
           <ArrowLeft className="w-4 h-4" /> Cancelar
         </button>
 
-        <div className="text-right">
-          <h2 className="text-xl font-extrabold text-slate-100 flex items-center justify-end gap-2">
-            <Sparkles className="w-5 h-5 text-amber-400" /> Criar Livro de Memórias
+        <div className="text-right min-w-0">
+          <h2 className="text-base sm:text-xl font-extrabold text-slate-100 flex items-center justify-end gap-1.5 sm:gap-2 truncate">
+            <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400 flex-shrink-0" />
+            <span className="hidden sm:inline">Criar Livro de Memórias</span><span className="sm:hidden">Criar Livro</span>
           </h2>
           <p className="text-xs text-slate-400">Passo {currentStep} de 6</p>
         </div>
