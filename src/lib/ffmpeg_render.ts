@@ -40,6 +40,9 @@ export interface RenderVideoParams {
 // 24fps é suficiente para slides estáticos (sem zoom contínuo) e reduz o trabalho de codificação.
 const FPS = 24;
 const MIN_DURATION = 20;
+// Piso bem menor que MIN_DURATION, usado só quando existe narração real — ver comentário
+// no cálculo de totalDuration abaixo sobre por que não usar MIN_DURATION nesse caso.
+const NARRATION_MIN_DURATION = 6;
 const MAX_DURATION = 75;
 const NARRATION_TAIL_SECONDS = 1.5;
 // Fontes empacotadas no próprio projeto (assets/fonts) em vez de um caminho do sistema operacional —
@@ -180,11 +183,17 @@ export async function renderVideoWithFFmpeg(params: RenderVideoParams): Promise<
     }
 
     // 4. Calcular a duração total do vídeo com base na narração (se existir)
+    // IMPORTANTE: quando há narração real, a duração do vídeo segue o tamanho DELA (+ o
+    // silêncio de cauda), sem aplicar o piso mínimo (MIN_DURATION) por cima — aplicar o piso
+    // aqui fazia o vídeo continuar tocando fotos além do fim da narração real, e como o áudio
+    // já tinha acabado, o restante ficava mudo (apad só preenche silêncio, não repete a fala).
+    // Um piso bem menor (NARRATION_MIN_DURATION) só evita um vídeo degenerado quase instantâneo
+    // se a narração vier anormalmente curta.
     let totalDuration: number;
     if (narrationTempPath) {
       const narrationDuration = await getMediaDurationSeconds(narrationTempPath);
       totalDuration = narrationDuration > 0
-        ? Math.min(MAX_DURATION, Math.max(MIN_DURATION, narrationDuration + NARRATION_TAIL_SECONDS))
+        ? Math.min(MAX_DURATION, Math.max(NARRATION_MIN_DURATION, narrationDuration + NARRATION_TAIL_SECONDS))
         : Math.max(MIN_DURATION, imageTempPaths.length * 5);
     } else {
       totalDuration = Math.min(MAX_DURATION, Math.max(MIN_DURATION, imageTempPaths.length * 5));
@@ -256,10 +265,18 @@ export async function renderVideoWithFFmpeg(params: RenderVideoParams): Promise<
 
       const sentences = splitIntoSentences(params.tributeText);
       if (sentences.length > 0) {
-        const perChunk = totalDuration / sentences.length;
+        // Frases mais longas levam mais tempo pra serem faladas que frases curtas — dividir a
+        // duração em partes IGUAIS por número de frases (como era antes) ignora isso e desalinha
+        // a legenda da narração real ao longo do vídeo. Aproxima o tempo de fala de cada frase
+        // pela proporção de caracteres dela sobre o texto inteiro, que acompanha bem melhor o
+        // ritmo real da fala do que uma divisão por contagem de frases.
+        const totalChars = sentences.reduce((sum, s) => sum + s.length, 0) || 1;
+        let cursor = 0;
         sentences.forEach((sentence, idx) => {
-          const start = idx * perChunk;
-          const end = (idx + 1) * perChunk;
+          const chunkDuration = (sentence.length / totalChars) * totalDuration;
+          const start = cursor;
+          const end = cursor + chunkDuration;
+          cursor = end;
           const wrapped = wrapTextForSubtitle(sentence);
           const subPath = writeTempTextFile(wrapped, `sub_${idx}`);
           tempFilesToDelete.push(subPath);

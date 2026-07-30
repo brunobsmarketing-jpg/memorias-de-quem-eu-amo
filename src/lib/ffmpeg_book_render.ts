@@ -30,6 +30,9 @@ export interface RenderMemoryBookParams {
 
 const FPS = 24;
 const MIN_DURATION = 15;
+// Piso bem menor que MIN_DURATION, usado só quando existe narração real — ver comentário
+// no cálculo de totalDuration abaixo sobre por que não usar MIN_DURATION nesse caso.
+const NARRATION_MIN_DURATION = 6;
 const MAX_DURATION = 90;
 const SECONDS_PER_PAGE = 5;
 const NARRATION_TAIL_SECONDS = 1.5;
@@ -98,11 +101,15 @@ export async function renderMemoryBookWithFFmpeg(params: RenderMemoryBookParams)
 
     const n = pageTempPaths.length;
 
+    // IMPORTANTE: quando há narração real, a duração segue o tamanho DELA (+ silêncio de
+    // cauda), sem aplicar o piso mínimo (MIN_DURATION) por cima — aplicar o piso aqui fazia o
+    // vídeo continuar passando páginas além do fim da narração real, e como o áudio já tinha
+    // acabado (apad só preenche silêncio, não repete a fala), o restante ficava mudo.
     let totalDuration: number;
     if (narrationTempPath) {
       const narrationDuration = await getMediaDurationSeconds(ffmpegPath as string | null, narrationTempPath);
       totalDuration = narrationDuration > 0
-        ? Math.min(MAX_DURATION, Math.max(MIN_DURATION, narrationDuration + NARRATION_TAIL_SECONDS))
+        ? Math.min(MAX_DURATION, Math.max(NARRATION_MIN_DURATION, narrationDuration + NARRATION_TAIL_SECONDS))
         : Math.max(MIN_DURATION, n * SECONDS_PER_PAGE);
     } else {
       totalDuration = Math.min(MAX_DURATION, Math.max(MIN_DURATION, n * SECONDS_PER_PAGE));
