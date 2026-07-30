@@ -709,6 +709,23 @@ const MAX_PHOTOS_PER_JOB = 30;
 const MAX_AI_IMAGES_PER_JOB = 30;
 const MAX_BOOK_PAGES = 40;
 
+// Extrai o nome da coluna de uma mensagem de erro "coluna ausente" do Supabase — que vem em
+// dois formatos diferentes dependendo da causa:
+// 1) Erro cru do Postgres (coluna nunca existiu na tabela): column "xyz" of relation "..." does not exist
+// 2) PGRST204 do PostgREST (coluna existe no Postgres, mas o cache de schema da API está
+//    desatualizado — acontece depois de um ALTER TABLE rodado direto no SQL Editor, que não
+//    sempre dispara o reload automático do cache): Could not find the 'xyz' column of '...' in
+//    the schema cache
+// Sem cobrir os dois formatos, esse tipo de erro derruba o salvamento inteiro em vez de só
+// degradar sem aquele campo — foi exatamente o que aconteceu em produção com caption_style.
+function extractMissingColumnName(errorMessage: string | undefined): string | undefined {
+  if (!errorMessage) return undefined;
+  const match =
+    /column "([^"]+)"/.exec(errorMessage) ||
+    /Could not find the '([^']+)' column/.exec(errorMessage);
+  return match?.[1];
+}
+
 // Salva (cria ou atualiza) um vídeo de homenagem no banco central — é isso que faz o
 // cartão digital /c/{id} funcionar em qualquer dispositivo, não só no navegador de quem criou.
 // O dono do vídeo é sempre o usuário autenticado pelo session_token (nunca job.userId do corpo),
@@ -753,10 +770,9 @@ app.post('/api/videos', requireOwnership, async (req: AuthedRequest, res) => {
     let error: any = null;
     for (let attempt = 0; attempt < 5; attempt++) {
       ({ error } = await supabaseAdmin.from('video_jobs').upsert(row, { onConflict: 'id' }));
-      const missingColumnMatch = /column "([^"]+)"/.exec(error?.message || '');
-      const missingColumn = missingColumnMatch?.[1];
+      const missingColumn = extractMissingColumnName(error?.message);
       if (!error || !missingColumn || !(missingColumn in row)) break;
-      console.warn(`Coluna ${missingColumn} ausente no Supabase — salvando vídeo sem esse campo.`);
+      console.warn(`Coluna ${missingColumn} ausente/desatualizada no Supabase — salvando vídeo sem esse campo.`);
       delete row[missingColumn];
     }
     if (error) throw error;
@@ -851,10 +867,9 @@ app.post('/api/memory-books', requireOwnership, async (req: AuthedRequest, res) 
     let error: any = null;
     for (let attempt = 0; attempt < 5; attempt++) {
       ({ error } = await supabaseAdmin.from('memory_book_jobs').upsert(row, { onConflict: 'id' }));
-      const missingColumnMatch = /column "([^"]+)"/.exec(error?.message || '');
-      const missingColumn = missingColumnMatch?.[1];
+      const missingColumn = extractMissingColumnName(error?.message);
       if (!error || !missingColumn || !(missingColumn in row)) break;
-      console.warn(`Coluna ${missingColumn} ausente no Supabase — salvando livro sem esse campo.`);
+      console.warn(`Coluna ${missingColumn} ausente/desatualizada no Supabase — salvando livro sem esse campo.`);
       delete row[missingColumn];
     }
     if (error) throw error;
