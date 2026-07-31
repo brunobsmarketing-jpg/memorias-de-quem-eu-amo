@@ -46,23 +46,45 @@ export function writeTempTextFile(content: string, prefix: string): string {
 }
 
 /**
- * Usa o próprio binário do FFmpeg (sem depender de ffprobe) para ler a duração
- * de um arquivo de áudio a partir do cabeçalho impresso no stderr.
+ * Usa o próprio binário do FFmpeg (sem depender de ffprobe) para ler a duração real de um
+ * arquivo de áudio — decodificando o arquivo inteiro (via "-f null -") em vez de confiar só no
+ * cabeçalho impresso por "ffmpeg -i" sem decodificar nada. O cabeçalho é uma ESTIMATIVA (calculada
+ * a partir do bitrate ou de um índice VBR do próprio arquivo) e pode vir errada — principalmente
+ * em MP3s gerados por APIs de TTS (como a ElevenLabs) que nem sempre incluem um índice VBR preciso
+ * — o que já foi suspeito de causar a narração e a legenda saindo dessincronizadas do vídeo do
+ * Livro de Memórias (cada página ficando na tela por bem mais tempo que devia, e o vídeo
+ * continuando bem depois da narração real já ter acabado). Decodificar o áudio inteiro é mais
+ * lento que só ler o cabeçalho, mas a duração real da narração (no máximo ~90s) é rápida de
+ * decodificar, e o resultado é sempre exato, nunca uma estimativa.
  */
 export function getMediaDurationSeconds(ffmpegPath: string | null, filePath: string): Promise<number> {
   return new Promise((resolve) => {
     if (!ffmpegPath) return resolve(0);
-    const proc = spawn(ffmpegPath, ['-i', filePath]);
+    const proc = spawn(ffmpegPath, ['-i', filePath, '-vn', '-f', 'null', '-']);
     let stderrOutput = '';
+    proc.stdout.on('data', () => {});
     proc.stderr.on('data', (chunk) => {
       stderrOutput += chunk.toString();
     });
     proc.on('close', () => {
-      const match = stderrOutput.match(/Duration:\s*(\d{2}):(\d{2}):(\d{2}(?:\.\d+)?)/);
-      if (match) {
-        const hours = parseInt(match[1], 10);
-        const minutes = parseInt(match[2], 10);
-        const seconds = parseFloat(match[3]);
+      // Depois de decodificar tudo, a ÚLTIMA linha de progresso ("time=HH:MM:SS.ms") reflete
+      // exatamente até onde o áudio foi decodificado com sucesso — a duração real, não uma
+      // estimativa. Se por algum motivo nenhuma linha de progresso aparecer (arquivo vazio/
+      // corrompido), cai pro "Duration:" do cabeçalho como último recurso.
+      const progressMatches = [...stderrOutput.matchAll(/time=(\d{2}):(\d{2}):(\d{2}(?:\.\d+)?)/g)];
+      const lastProgress = progressMatches[progressMatches.length - 1];
+      if (lastProgress) {
+        const hours = parseInt(lastProgress[1], 10);
+        const minutes = parseInt(lastProgress[2], 10);
+        const seconds = parseFloat(lastProgress[3]);
+        resolve(hours * 3600 + minutes * 60 + seconds);
+        return;
+      }
+      const headerMatch = stderrOutput.match(/Duration:\s*(\d{2}):(\d{2}):(\d{2}(?:\.\d+)?)/);
+      if (headerMatch) {
+        const hours = parseInt(headerMatch[1], 10);
+        const minutes = parseInt(headerMatch[2], 10);
+        const seconds = parseFloat(headerMatch[3]);
         resolve(hours * 3600 + minutes * 60 + seconds);
       } else {
         resolve(0);
