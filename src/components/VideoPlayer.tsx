@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Play, Pause, RotateCcw, Volume2, VolumeX, Download, Maximize, Minimize, CheckCircle2 } from 'lucide-react';
+import { Play, Pause, RotateCcw, Volume2, VolumeX, Download, Maximize, Minimize, CheckCircle2, Tag, Mail, ShieldCheck } from 'lucide-react';
 import { VideoJob, CaptionStyle } from '../types';
 import { drawVideoFrame, getAllSlides } from '../lib/video';
 import { PRESET_TRACKS, DEFAULT_CAPTION_STYLE } from '../data/presets';
@@ -648,28 +648,43 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaption
       <div className="w-full max-w-lg mt-5 flex flex-col gap-3">
         {trialMode ? (
           trialWatermarkUrl ? (
-            <form onSubmit={handleRequestUnlock} className="space-y-4 bg-slate-900 border border-slate-800 rounded-2xl p-5">
-              <div className="space-y-1.5 text-center">
-                <p className="text-base font-extrabold text-slate-100">Esse já é o SEU vídeo pronto</p>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Você acabou de ver o resultado final — sem surpresa nenhuma. É só liberar a versão limpa,
-                  sem marca d'água, em segundos.
+            <form onSubmit={handleRequestUnlock} className="space-y-5 bg-slate-900 border border-slate-800 rounded-2xl p-5">
+              <div className="space-y-2 text-center">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 mx-auto">
+                  <CheckCircle2 className="w-3 h-3" /> Vídeo pronto — você acabou de assistir
+                </div>
+                <p className="text-base font-extrabold text-slate-100">Libere sem marca d'água</p>
+                <p className="text-xs text-slate-400 leading-relaxed max-w-xs mx-auto">
+                  Sem surpresa nenhuma: o vídeo que chega em HD é exatamente o que você acabou de ver — só sem
+                  a marca d'água por cima.
                 </p>
               </div>
 
-              <ul className="space-y-1.5">
+              <div className="flex items-center justify-center gap-2 py-2 border-y border-slate-800">
+                <Tag className="w-4 h-4 text-amber-400" />
+                <span className="text-2xl font-extrabold text-slate-100">R$ 29,90</span>
+                <span className="text-xs text-slate-500 font-medium">pagamento único</span>
+              </div>
+
+              <ul className="space-y-2">
                 {[
-                  'Você já viu o vídeo pronto — não é uma promessa, é o que você acabou de assistir',
-                  'Liberação automática: assim que o pagamento é aprovado, o vídeo em HD já chega no seu e-mail',
-                  'Pagamento único — sem assinatura, sem mensalidade',
-                  'Checkout seguro e criptografado',
-                ].map((item) => (
-                  <li key={item} className="flex items-start gap-2 text-xs text-slate-300">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
-                    <span>{item}</span>
+                  { icon: CheckCircle2, text: 'Libera este vídeo em HD, sem marca d\'água — arquivo seu, pra sempre' },
+                  { icon: Mail, text: 'Entrega automática por e-mail assim que o pagamento é aprovado (poucos minutos)' },
+                  { icon: ShieldCheck, text: 'Pagamento único — sem assinatura, sem mensalidade, sem cobrança recorrente' },
+                  { icon: ShieldCheck, text: 'Checkout seguro e criptografado' },
+                ].map(({ icon: Icon, text }) => (
+                  <li key={text} className="flex items-start gap-2 text-xs text-slate-300">
+                    <Icon className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
+                    <span>{text}</span>
                   </li>
                 ))}
               </ul>
+
+              <p className="text-[11px] text-slate-500 text-center leading-relaxed">
+                Essa compra libera <strong className="text-slate-400">este</strong> vídeo que você acabou de criar.
+                Quer fazer outra homenagem com outras fotos depois? É só criar uma nova prévia — cada vídeo é
+                liberado separadamente.
+              </p>
 
               <input
                 type="text"
@@ -691,11 +706,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaption
                 disabled={isRequestingUnlock}
                 className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-60 text-black font-extrabold text-sm rounded-xl shadow-lg transition-transform active:scale-98"
               >
-                {isRequestingUnlock ? 'Redirecionando...' : "Liberar Vídeo sem Marca d'Água"}
+                {isRequestingUnlock ? 'Redirecionando...' : 'Liberar Vídeo em HD — R$ 29,90'}
               </button>
               <p className="text-[11px] text-slate-500 text-center">
-                Você será redirecionado pro pagamento seguro. O vídeo em HD chega no seu e-mail assim que confirmar
-                — geralmente em poucos minutos.
+                Você será redirecionado pro pagamento seguro da Payt. O vídeo em HD chega no seu e-mail assim que
+                confirmar — geralmente em poucos minutos.
               </p>
             </form>
           ) : (
