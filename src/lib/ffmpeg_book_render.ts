@@ -84,27 +84,27 @@ export async function renderMemoryBookWithFFmpeg(params: RenderMemoryBookParams)
       return url;
     });
 
-    let narrationTempPath = '';
-    if (params.narrationAudioDataUrl?.startsWith('data:audio')) {
-      narrationTempPath = saveBase64ToTempFile(params.narrationAudioDataUrl, 'narration', 'mp3');
-      tempFilesToDelete.push(narrationTempPath);
-    } else if (params.narrationAudioDataUrl?.startsWith('http')) {
-      try {
-        narrationTempPath = await downloadUrlToTempFile(params.narrationAudioDataUrl, 'narration', 'mp3');
-        tempFilesToDelete.push(narrationTempPath);
-      } catch (narrationErr) {
-        console.warn('⚠️ Não foi possível baixar a narração, seguindo sem ela:', narrationErr);
-      }
-    }
-
+    // Narração e trilha sonora baixadas em PARALELO (eram sequenciais à toa) — tira alguns
+    // segundos do tempo total até o vídeo do livro ficar pronto.
     const track = PRESET_TRACKS.find((t) => t.id === params.selectedTrackId) || PRESET_TRACKS[0];
-    let musicTempPath = '';
-    try {
-      musicTempPath = await downloadUrlToTempFile(track.audioUrl, 'music', 'mp3');
-      tempFilesToDelete.push(musicTempPath);
-    } catch (musicErr) {
+
+    const narrationPromise: Promise<string> = params.narrationAudioDataUrl?.startsWith('data:audio')
+      ? Promise.resolve(saveBase64ToTempFile(params.narrationAudioDataUrl, 'narration', 'mp3'))
+      : params.narrationAudioDataUrl?.startsWith('http')
+        ? downloadUrlToTempFile(params.narrationAudioDataUrl, 'narration', 'mp3').catch((narrationErr) => {
+            console.warn('⚠️ Não foi possível baixar a narração, seguindo sem ela:', narrationErr);
+            return '';
+          })
+        : Promise.resolve('');
+
+    const musicPromise: Promise<string> = downloadUrlToTempFile(track.audioUrl, 'music', 'mp3').catch((musicErr) => {
       console.warn('⚠️ Não foi possível baixar a trilha sonora, seguindo sem música de fundo:', musicErr);
-    }
+      return '';
+    });
+
+    const [narrationTempPath, musicTempPath] = await Promise.all([narrationPromise, musicPromise]);
+    if (narrationTempPath) tempFilesToDelete.push(narrationTempPath);
+    if (musicTempPath) tempFilesToDelete.push(musicTempPath);
 
     const n = pageTempPaths.length;
 
@@ -201,7 +201,7 @@ export async function renderMemoryBookWithFFmpeg(params: RenderMemoryBookParams)
 
       const outputOptions = [
         '-c:v libx264',
-        '-preset veryfast',
+        '-preset superfast', // mais rápido que "veryfast" — arquivo um pouco maior, imperceptível num vídeo curto
         '-threads 1',
         '-pix_fmt yuv420p',
         `-r ${FPS}`,

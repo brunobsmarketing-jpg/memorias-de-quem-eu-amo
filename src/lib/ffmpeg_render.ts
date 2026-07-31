@@ -58,8 +58,11 @@ function buildWatermarkGridFilters(
   outputHeight: number,
   tempFilesToDelete: string[]
 ): { filters: string[]; videoLabel: string } {
-  const CELL_WIDTH = 380;
-  const CELL_HEIGHT = 230;
+  // Células maiores que antes (menos "drawtext" empilhados no filtergraph = renderização mais
+  // rápida) — cada "drawtext" custa CPU por frame, e a prévia com marca d'água já soma isso a
+  // legenda/título; ainda cobre o quadro inteiro em padrão "tijolo", só com menos repetições.
+  const CELL_WIDTH = 540;
+  const CELL_HEIGHT = 360;
   const cols = Math.ceil(outputWidth / CELL_WIDTH);
   const rows = Math.ceil(outputHeight / CELL_HEIGHT);
 
@@ -309,31 +312,28 @@ export async function renderVideoWithFFmpeg(params: RenderVideoParams): Promise<
       throw new Error('Nenhuma foto disponível para renderizar o vídeo.');
     }
 
-    // 2. Salvar narração em arquivo temporário, se houver — pode chegar como data URL (base64,
-    // caso acabou de ser gerada) ou como URL https do Supabase Storage (caso o vídeo já tenha
-    // sido sincronizado antes do download, quando o data URL é substituído por uma URL permanente).
-    let narrationTempPath = '';
-    if (params.narrationAudioDataUrl?.startsWith('data:audio')) {
-      narrationTempPath = saveBase64ToTempFile(params.narrationAudioDataUrl, 'narration', 'mp3');
-      tempFilesToDelete.push(narrationTempPath);
-    } else if (params.narrationAudioDataUrl?.startsWith('http')) {
-      try {
-        narrationTempPath = await downloadUrlToTempFile(params.narrationAudioDataUrl, 'narration', 'mp3');
-        tempFilesToDelete.push(narrationTempPath);
-      } catch (narrationErr) {
-        console.warn('⚠️ Não foi possível baixar a narração, seguindo sem ela:', narrationErr);
-      }
-    }
-
-    // 3. Baixar a trilha sonora escolhida
+    // 2. Narração (se houver) e 3. trilha sonora — baixadas em PARALELO (eram sequenciais, uma
+    // esperando a outra terminar à toa, já que não dependem entre si) pra tirar alguns segundos
+    // do tempo total até o vídeo ficar pronto.
     const track = PRESET_TRACKS.find((t) => t.id === params.selectedTrackId) || PRESET_TRACKS[0];
-    let musicTempPath = '';
-    try {
-      musicTempPath = await downloadUrlToTempFile(track.audioUrl, 'music', 'mp3');
-      tempFilesToDelete.push(musicTempPath);
-    } catch (musicErr) {
+
+    const narrationPromise: Promise<string> = params.narrationAudioDataUrl?.startsWith('data:audio')
+      ? Promise.resolve(saveBase64ToTempFile(params.narrationAudioDataUrl, 'narration', 'mp3'))
+      : params.narrationAudioDataUrl?.startsWith('http')
+        ? downloadUrlToTempFile(params.narrationAudioDataUrl, 'narration', 'mp3').catch((narrationErr) => {
+            console.warn('⚠️ Não foi possível baixar a narração, seguindo sem ela:', narrationErr);
+            return '';
+          })
+        : Promise.resolve('');
+
+    const musicPromise: Promise<string> = downloadUrlToTempFile(track.audioUrl, 'music', 'mp3').catch((musicErr) => {
       console.warn('⚠️ Não foi possível baixar a trilha sonora, seguindo sem música de fundo:', musicErr);
-    }
+      return '';
+    });
+
+    const [narrationTempPath, musicTempPath] = await Promise.all([narrationPromise, musicPromise]);
+    if (narrationTempPath) tempFilesToDelete.push(narrationTempPath);
+    if (musicTempPath) tempFilesToDelete.push(musicTempPath);
 
     // 4. Calcular a duração total do vídeo com base na narração (se existir)
     // IMPORTANTE: quando há narração real, a duração do vídeo segue o tamanho DELA (+ o
@@ -456,7 +456,7 @@ export async function renderVideoWithFFmpeg(params: RenderVideoParams): Promise<
 
       const outputOptions = [
         '-c:v libx264',
-        '-preset veryfast', // menos memória/CPU no encoder (troca um pouco de eficiência de compressão por leveza)
+        '-preset superfast', // mais rápido que "veryfast" — perde um pouco de eficiência de compressão (arquivo um pouco maior), imperceptível num vídeo curto de rede social, mas corta tempo real de espera na tela final
         '-threads 1', // evita overhead de múltiplas threads em ambientes com pouca CPU/RAM (ex: Render free tier)
         '-pix_fmt yuv420p',
         `-r ${FPS}`,

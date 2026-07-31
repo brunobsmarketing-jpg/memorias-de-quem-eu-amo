@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Play, Pause, RotateCcw, Volume2, VolumeX, Download, Maximize, Minimize } from 'lucide-react';
+import { Play, Pause, RotateCcw, Volume2, VolumeX, Download, Maximize, Minimize, CheckCircle2 } from 'lucide-react';
 import { VideoJob, CaptionStyle } from '../types';
 import { drawVideoFrame, getAllSlides } from '../lib/video';
 import { PRESET_TRACKS, DEFAULT_CAPTION_STYLE } from '../data/presets';
@@ -498,6 +498,20 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaption
     }
   };
 
+  // Igual ao auto-render do funil pago (ver useEffect acima) — a pessoa não pode chegar nesta
+  // tela e só ENTÃO apertar um botão pra começar a esperar; isso soma o tempo de renderização
+  // (~1-2min) ao tempo que ela já levou preenchendo o wizard, e é exatamente o tipo de espera que
+  // faz alguém desistir antes de ver o resultado. Dispara a prévia com marca d'água assim que a
+  // tela aparece, e a UI (botão desabilitado com o status) mostra o progresso — sem clique nenhum
+  // no caminho feliz. Guardado por ref pra nunca disparar duas vezes (StrictMode, re-renders).
+  const hasAutoStartedTrialRenderRef = useRef(false);
+  useEffect(() => {
+    if (!trialMode || hasAutoStartedTrialRenderRef.current) return;
+    hasAutoStartedTrialRenderRef.current = true;
+    handleGenerateWatermarkedPreview();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trialMode]);
+
   const handleRequestUnlock = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!unlockEmail.trim()) {
@@ -634,8 +648,29 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaption
       <div className="w-full max-w-lg mt-5 flex flex-col gap-3">
         {trialMode ? (
           trialWatermarkUrl ? (
-            <form onSubmit={handleRequestUnlock} className="space-y-3 bg-slate-900 border border-slate-800 rounded-2xl p-4">
-              <p className="text-sm font-bold text-slate-100 text-center">Gostou? Libere sem marca d'água</p>
+            <form onSubmit={handleRequestUnlock} className="space-y-4 bg-slate-900 border border-slate-800 rounded-2xl p-5">
+              <div className="space-y-1.5 text-center">
+                <p className="text-base font-extrabold text-slate-100">Esse já é o SEU vídeo pronto</p>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Você acabou de ver o resultado final — sem surpresa nenhuma. É só liberar a versão limpa,
+                  sem marca d'água, em segundos.
+                </p>
+              </div>
+
+              <ul className="space-y-1.5">
+                {[
+                  'Você já viu o vídeo pronto — não é uma promessa, é o que você acabou de assistir',
+                  'Liberação automática: assim que o pagamento é aprovado, o vídeo em HD já chega no seu e-mail',
+                  'Pagamento único — sem assinatura, sem mensalidade',
+                  'Checkout seguro e criptografado',
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2 text-xs text-slate-300">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+
               <input
                 type="text"
                 value={unlockName}
@@ -659,7 +694,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaption
                 {isRequestingUnlock ? 'Redirecionando...' : "Liberar Vídeo sem Marca d'Água"}
               </button>
               <p className="text-[11px] text-slate-500 text-center">
-                Você será redirecionado pro pagamento seguro. O vídeo em HD chega no seu e-mail assim que confirmar.
+                Você será redirecionado pro pagamento seguro. O vídeo em HD chega no seu e-mail assim que confirmar
+                — geralmente em poucos minutos.
               </p>
             </form>
           ) : (
