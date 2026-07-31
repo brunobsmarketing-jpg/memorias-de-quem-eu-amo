@@ -10,7 +10,7 @@ import {
   Step5AIImagesOption,
 } from './WizardSteps';
 import { VideoPlayer } from './VideoPlayer';
-import { saveVideoJob } from '../lib/credits';
+import { saveVideoJob, saveStoredUser } from '../lib/credits';
 import { uploadVideoJobMedia, saveVideoJobRemote } from '../lib/videoApi';
 import { saveTrialVideoRemote } from '../lib/trialVideoApi';
 import { deductCreditRemote } from '../lib/authApi';
@@ -184,6 +184,7 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
         return;
       }
       setUser(updatedUser);
+      saveStoredUser(updatedUser);
     }
 
     const videoId = `vid_${Date.now()}`;

@@ -72,6 +72,26 @@ export default function App() {
 
   const [paymentBanner, setPaymentBanner] = useState<{ type: 'success' | 'pending' | 'failure'; message: string } | null>(null);
 
+  // O usuário exibido na tela nasce do cache local (useState acima) pra abrir instantâneo, mas
+  // esse cache só é reescrito em login/pagamento — ações que gastam crédito (criar vídeo/livro)
+  // atualizam o saldo real no servidor mas não o cache, então um simples F5 voltava a mostrar o
+  // saldo antigo (bug relatado: "créditos voltam pra 4" a cada atualização de página). Como
+  // loginByEmail é idempotente pra quem já tem conta (só busca/retorna o registro existente, não
+  // reseta nada), chamá-lo ao abrir a página busca o saldo real do servidor sem precisar deslogar.
+  useEffect(() => {
+    const storedUser = getStoredUser();
+    if (!storedUser?.email) return;
+    loginByEmail(storedUser.email, storedUser.name)
+      .then((freshUser) => {
+        saveStoredUser(freshUser);
+        setUser(freshUser);
+      })
+      .catch((e) => {
+        console.error('Erro ao sincronizar usuário com o servidor:', e);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Trata o retorno do checkout da Mercado Pago (back_urls em /api/checkout/create-preference).
   // Os créditos já foram (ou serão) liberados via webhook no servidor — aqui só refletimos o
   // resultado pro usuário e buscamos o saldo atualizado, já que o webhook pode levar alguns

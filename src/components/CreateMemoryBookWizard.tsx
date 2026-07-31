@@ -8,7 +8,7 @@ import { Step2TextTribute, Step3NarrationVoice, Step4MusicTrack } from './Wizard
 import { BookVideoPlayer } from './BookVideoPlayer';
 import { exportBookPageToPng } from '../lib/bookRenderer';
 import { saveMemoryBookRemote, uploadMemoryBookMedia } from '../lib/bookApi';
-import { saveMemoryBookJob } from '../lib/credits';
+import { saveMemoryBookJob, saveStoredUser } from '../lib/credits';
 import { deductCreditRemote } from '../lib/authApi';
 import { PRESET_VOICES, PRESET_TRACKS } from '../data/presets';
 import { saveDraft, loadDraft, clearDraft } from '../lib/draftPersistence';
@@ -147,6 +147,7 @@ export const CreateMemoryBookWizard: React.FC<CreateMemoryBookWizardProps> = ({
       return;
     }
     setUser(updatedUser);
+    saveStoredUser(updatedUser);
 
     const bookId = `book_${Date.now()}`;
     const cardUrl = `${window.location.origin}/b/${bookId}`;
