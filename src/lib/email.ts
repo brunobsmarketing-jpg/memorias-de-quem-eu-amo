@@ -65,12 +65,14 @@ export async function sendAccessGrantedEmail(params: { to: string; name?: string
 }
 
 /**
- * Dispara o e-mail com o link do vídeo liberado no funil "crie primeiro, pague depois" — quem
- * paga por esse fluxo NÃO vira sócio (sem créditos, sem is_paid_member), então não faz sentido
- * mandar pro login da área de membros como no e-mail acima: o link direto do cartão digital
- * (/c/{id}, público, sem login) é o próprio destino final dessa pessoa.
+ * Dispara o e-mail com o link do vídeo liberado no funil "crie primeiro, pague depois" — a
+ * pessoa já criou e viu o vídeo com marca d'água ANTES de pagar, então o link direto do cartão
+ * digital (/c/{id}, público, sem login) é o destino mais relevante logo de cara. Quem compra por
+ * esse funil também vira sócia com créditos (mesma oferta da página de vendas principal, ver
+ * grantInitialAccessByEmail em server.ts) — quando remainingCredits é informado, o e-mail avisa
+ * sobre os créditos restantes e como entrar na área de membros pra criar mais homenagens.
  */
-export async function sendTrialVideoUnlockedEmail(params: { to: string; name?: string; cardUrl: string }): Promise<void> {
+export async function sendTrialVideoUnlockedEmail(params: { to: string; name?: string; cardUrl: string; remainingCredits?: number }): Promise<void> {
   if (!resend) {
     console.warn(`E-mail de vídeo liberado não enviado para ${params.to} — RESEND_API_KEY não configurada.`);
     return;
@@ -78,6 +80,19 @@ export async function sendTrialVideoUnlockedEmail(params: { to: string; name?: s
 
   const firstName = (params.name || '').trim().split(' ')[0] || '';
   const greeting = firstName ? `Oi, ${firstName}!` : 'Oi!';
+
+  const hasRemainingCredits = typeof params.remainingCredits === 'number';
+  const creditsParagraphHtml = hasRemainingCredits
+    ? `<p style="font-size: 15px; line-height: 1.6; margin: 0 0 24px;">
+        Seu pagamento também liberou o acesso à sua conta Memora, com
+        <strong>${params.remainingCredits} crédito(s)</strong> restante(s) pra criar novas homenagens (vídeo ou
+        Livro de Memórias). Para entrar, acesse <strong>${APP_LOGIN_URL}</strong> e informe o mesmo e-mail
+        desta compra (${params.to}) — não é preciso senha.
+      </p>`
+    : '';
+  const creditsParagraphText = hasRemainingCredits
+    ? `\n\nSeu pagamento também liberou o acesso à sua conta Memora, com ${params.remainingCredits} crédito(s) restante(s) pra criar novas homenagens. Para entrar, acesse ${APP_LOGIN_URL} e informe o mesmo e-mail desta compra (${params.to}) — não é preciso senha.`
+    : '';
 
   const html = `
     <div style="font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; color: #1e293b;">
@@ -89,13 +104,14 @@ export async function sendTrialVideoUnlockedEmail(params: { to: string; name?: s
       <a href="${params.cardUrl}" style="display: inline-block; background: linear-gradient(to right, #f59e0b, #f97316); color: #000; font-weight: 800; font-size: 14px; padding: 14px 28px; border-radius: 12px; text-decoration: none;">
         Ver Meu Vídeo
       </a>
-      <p style="font-size: 12px; color: #64748b; margin: 24px 0 0;">
+      <p style="font-size: 12px; color: #64748b; margin: 24px 0 0 0;">
         ${params.cardUrl}
       </p>
+      ${creditsParagraphHtml}
     </div>
   `.trim();
 
-  const text = `${greeting}\n\nSeu pagamento foi confirmado e seu vídeo em HD, sem marca d'água, já está pronto: ${params.cardUrl}`;
+  const text = `${greeting}\n\nSeu pagamento foi confirmado e seu vídeo em HD, sem marca d'água, já está pronto: ${params.cardUrl}${creditsParagraphText}`;
 
   try {
     const { error } = await resend.emails.send({

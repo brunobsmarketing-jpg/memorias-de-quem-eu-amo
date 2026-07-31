@@ -607,41 +607,27 @@ async function revokeInitialAccessByEmail(email: string, reason: string) {
   return updated;
 }
 
-/** Desbloqueia o vídeo do funil "crie primeiro, pague depois" depois que a Payt confirma o
- * pagamento do produto de vídeo avulso. A Payt não amarra a compra a uma referência específica
- * (só informa o e-mail — ver PAYT_TRIAL_UNLOCK_CHECKOUT_URL em src/lib/paytCatalog.ts), então a
- * regra é: libera o vídeo com status 'watermarked' MAIS RECENTE daquele e-mail. Cobre bem o caso
- * normal (cria uma prévia, gosta, compra na hora); se a pessoa tiver várias prévias pendentes do
- * mesmo e-mail, só a mais recente é liberada. */
-async function unlockMostRecentWatermarkedVideoByEmail(email: string) {
-  const normalizedEmail = String(email).trim().toLowerCase();
-
-  const { data: user, error: userError } = await supabaseAdmin
-    .from('app_users')
-    .select('id')
-    .eq('email', normalizedEmail)
-    .maybeSingle();
-  if (userError) throw userError;
-  if (!user) {
-    console.warn(`Webhook Payt (vídeo avulso): nenhuma conta encontrada para ${normalizedEmail} — nenhum vídeo liberado.`);
-    return;
-  }
-
+/** Depois que o webhook da Payt concede os créditos (grantInitialAccessByEmail), verifica se
+ * esse usuário tem uma prévia com marca d'água pendente — caso de quem veio do funil "crie
+ * primeiro, pague depois" (rota /experimente): já criou e viu o vídeo ANTES de pagar. Se houver,
+ * finaliza a renderização sem marca d'água e consome 1 dos créditos recém-concedidos (o vídeo que
+ * a pessoa já viu conta como uma das homenagens da oferta, não é bônus por fora). Roda pra
+ * QUALQUER produto pago — não só o do funil alternativo — cobrindo até o caso raro de alguém
+ * testar a prévia e comprar pela página de vendas principal com o mesmo e-mail.
+ * Retorna a URL do cartão digital se um vídeo foi finalizado, ou null se não havia nenhum. */
+async function finishPendingWatermarkedVideoForUser(userId: string, currentCredits: number): Promise<string | null> {
   const { data: job, error: jobError } = await supabaseAdmin
     .from('video_jobs')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .eq('status', 'watermarked')
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
   if (jobError) throw jobError;
-  if (!job) {
-    console.warn(`Webhook Payt (vídeo avulso): nenhuma prévia pendente encontrada para ${normalizedEmail} — nenhum vídeo liberado.`);
-    return;
-  }
+  if (!job) return null;
 
-  console.log(`🔓 Desbloqueando vídeo avulso ${job.id} para ${normalizedEmail}...`);
+  console.log(`🔓 Finalizando prévia ${job.id} (funil "crie primeiro, pague depois")...`);
   const durableMp4Url = await renderAndPublishVideo({
     videoId: job.id,
     fatherName: job.father_name || 'Pai',
@@ -657,12 +643,10 @@ async function unlockMostRecentWatermarkedVideoByEmail(email: string) {
   });
 
   await supabaseAdmin.from('video_jobs').update({ unlocked_video_url: durableMp4Url, status: 'unlocked' }).eq('id', job.id);
-  console.log(`✅ Vídeo avulso ${job.id} liberado (sem marca d'água) para ${normalizedEmail}`);
+  await supabaseAdmin.from('app_users').update({ credits: Math.max(0, currentCredits - 1) }).eq('id', userId);
+  console.log(`✅ Prévia ${job.id} liberada (sem marca d'água) — 1 crédito consumido.`);
 
-  // Esse funil não vira sócio (sem login/área de membros) — o cartão digital público (/c/{id})
-  // é o próprio destino final, então o e-mail manda direto pra lá em vez de pro login.
-  const cardUrl = job.card_url || `${(process.env.APP_URL || 'https://app.memoriasdequemeuamo.com.br').replace(/\/$/, '')}/c/${job.id}`;
-  await sendTrialVideoUnlockedEmail({ to: normalizedEmail, cardUrl });
+  return job.card_url || `${(process.env.APP_URL || 'https://app.memoriasdequemeuamo.com.br').replace(/\/$/, '')}/c/${job.id}`;
 }
 
 // Webhook (postback) da Payt — usado só pra compra inicial (virar membro pago), feita numa
@@ -733,19 +717,26 @@ app.post('/api/webhook/payt/:token', webhookLimiter, async (req, res) => {
       return;
     }
 
-    if (product.unlockType === 'single-video-unlock') {
-      // Funil "crie primeiro, pague depois": não concede créditos nem membership, só libera o
-      // vídeo com marca d'água mais recente daquele e-mail (ver função acima).
-      await unlockMostRecentWatermarkedVideoByEmail(email);
-      return;
-    }
-
-    await grantInitialAccessByEmail({ email, name, credits: product.credits, packageId: product.packageId, amountBRL, externalId });
+    const userRow = await grantInitialAccessByEmail({ email, name, credits: product.credits, packageId: product.packageId, amountBRL, externalId });
     console.log(`✅ ${product.credits} crédito(s) liberado(s) via webhook Payt para ${email}`);
 
+    // Cobre quem veio do funil "crie primeiro, pague depois" (rota /experimente): já criou e viu
+    // o vídeo com marca d'água antes de pagar — finaliza ele agora, consumindo 1 dos créditos
+    // recém-concedidos, em vez de deixar a pessoa ter que criar tudo de novo na área de membros.
+    const unlockedCardUrl = await finishPendingWatermarkedVideoForUser(userRow.id, userRow.credits);
+
     // Login é só por e-mail, sem senha — sem esse aviso a pessoa paga e não tem como saber que
-    // já pode entrar, nem com qual e-mail. sendAccessGrantedEmail nunca lança erro pra fora.
-    await sendAccessGrantedEmail({ to: email, name, credits: product.credits });
+    // já pode entrar, nem com qual e-mail. Nenhum dos dois e-mails abaixo lança erro pra fora.
+    if (unlockedCardUrl) {
+      await sendTrialVideoUnlockedEmail({
+        to: email,
+        name,
+        cardUrl: unlockedCardUrl,
+        remainingCredits: Math.max(0, userRow.credits - 1),
+      });
+    } else {
+      await sendAccessGrantedEmail({ to: email, name, credits: product.credits });
+    }
   } catch (error: any) {
     console.error('Erro ao processar webhook Payt:', error);
   }
@@ -991,9 +982,9 @@ app.post('/api/trial-videos', trialLimiter, async (req, res) => {
 });
 
 /** Capturado o e-mail no clique de "Liberar sem marca d'água", associa esse e-mail (novo ou já
- * existente) ao dono do vídeo e devolve o link de checkout da Payt pro produto de vídeo avulso.
- * O desbloqueio de verdade só acontece depois, quando o webhook da Payt confirmar o pagamento
- * (ver unlockMostRecentWatermarkedVideoByEmail). */
+ * existente) ao dono do vídeo e devolve o link de checkout da Payt. O desbloqueio de verdade só
+ * acontece depois, quando o webhook da Payt confirmar o pagamento (ver
+ * finishPendingWatermarkedVideoForUser). */
 app.post('/api/trial-videos/:id/request-unlock', trialLimiter, async (req, res) => {
   try {
     const { email, name } = req.body;
@@ -1568,7 +1559,7 @@ interface RenderAndPublishParams {
 /**
  * Roda o FFmpeg (via fila) e sobe o MP4 resultante pro Supabase Storage — extraído de
  * /api/render-video pra ser reaproveitado também pelo desbloqueio via webhook da Payt do funil
- * "crie primeiro, pague depois" (ver unlockMostRecentWatermarkedVideoByEmail abaixo), que dispara
+ * "crie primeiro, pague depois" (ver finishPendingWatermarkedVideoForUser abaixo), que dispara
  * a MESMA renderização (só que sem marca d'água) a partir dos dados já salvos no video_jobs, sem
  * passar por uma requisição HTTP do cliente.
  */
@@ -1652,7 +1643,7 @@ app.post('/api/render-video', renderLimiter, async (req, res) => {
 
     // Prévia com marca d'água (funil "crie primeiro, pague depois") grava em watermark_video_url
     // e mantém status 'watermarked' — o desbloqueio de verdade só acontece no webhook da Payt
-    // (ver unlockMostRecentWatermarkedVideoByEmail), nunca aqui.
+    // (ver finishPendingWatermarkedVideoForUser), nunca aqui.
     const updatePayload = watermark
       ? { watermark_video_url: durableMp4Url, status: 'watermarked' }
       : { unlocked_video_url: durableMp4Url };

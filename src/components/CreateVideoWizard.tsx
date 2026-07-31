@@ -397,13 +397,13 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
         {currentStep === 6 && createdJob && (
           <div className="space-y-6 text-center">
             <div className="space-y-2">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
-                <CheckCircle2 className="w-3.5 h-3.5" /> {trialMode ? 'Sua Homenagem Está Montada!' : 'Vídeo Pronto em HD!'}
+              <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                <CheckCircle2 className="w-4 h-4" /> {trialMode ? 'Sua Homenagem Está Montada!' : 'Vídeo Pronto em HD!'}
               </span>
-              <h3 className="text-2xl font-bold text-slate-100">
+              <h3 className="text-2xl sm:text-3xl font-bold text-slate-100">
                 Sua Homenagem para {createdJob.fatherName} está pronta
               </h3>
-              <p className="text-slate-400 text-sm max-w-md mx-auto">
+              <p className="text-slate-400 text-base max-w-md mx-auto">
                 {trialMode
                   ? 'Gere a prévia com marca d\'água pra ver o resultado real — se gostar, é só liberar sem marca d\'água.'
                   : 'Baixe o vídeo em HD ou avance para pegar o link do Cartão Digital e enviar para o seu pai.'}

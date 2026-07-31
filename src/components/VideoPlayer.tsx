@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Play, Pause, RotateCcw, Volume2, VolumeX, Download, Maximize, Minimize, CheckCircle2, Tag, Mail, ShieldCheck } from 'lucide-react';
+import { Play, Pause, RotateCcw, Volume2, VolumeX, Download, Maximize, Minimize, CheckCircle2, Tag, Mail, ShieldCheck, Sparkles, Share2 } from 'lucide-react';
 import { VideoJob, CaptionStyle } from '../types';
 import { drawVideoFrame, getAllSlides } from '../lib/video';
 import { PRESET_TRACKS, DEFAULT_CAPTION_STYLE } from '../data/presets';
@@ -648,50 +648,51 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaption
       <div className="w-full max-w-lg mt-5 flex flex-col gap-3">
         {trialMode ? (
           trialWatermarkUrl ? (
-            <form onSubmit={handleRequestUnlock} className="space-y-5 bg-slate-900 border border-slate-800 rounded-2xl p-5">
-              <div className="space-y-2 text-center">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 mx-auto">
-                  <CheckCircle2 className="w-3 h-3" /> Vídeo pronto — você acabou de assistir
+            <form onSubmit={handleRequestUnlock} className="space-y-6 bg-slate-900 border border-slate-800 rounded-2xl p-6">
+              <div className="space-y-2.5 text-center">
+                <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 mx-auto">
+                  <CheckCircle2 className="w-4 h-4" /> Vídeo pronto — você acabou de assistir
                 </div>
-                <p className="text-base font-extrabold text-slate-100">Libere sem marca d'água</p>
-                <p className="text-xs text-slate-400 leading-relaxed max-w-xs mx-auto">
-                  Sem surpresa nenhuma: o vídeo que chega em HD é exatamente o que você acabou de ver — só sem
-                  a marca d'água por cima.
+                <p className="text-xl font-extrabold text-slate-100">Libere sem marca d'água + 4 homenagens extras</p>
+                <p className="text-sm text-slate-400 leading-relaxed max-w-sm mx-auto">
+                  Sem surpresa nenhuma: o vídeo que chega em HD é exatamente o que você acabou de ver. E essa
+                  compra não libera só ele — você ganha acesso completo à Memora.
                 </p>
               </div>
 
-              <div className="flex items-center justify-center gap-2 py-2 border-y border-slate-800">
-                <Tag className="w-4 h-4 text-amber-400" />
-                <span className="text-2xl font-extrabold text-slate-100">R$ 29,90</span>
-                <span className="text-xs text-slate-500 font-medium">pagamento único</span>
+              <div className="flex items-center justify-center gap-2 py-3 border-y border-slate-800">
+                <Tag className="w-5 h-5 text-amber-400" />
+                <span className="text-3xl font-extrabold text-slate-100">R$ 29,90</span>
+                <span className="text-sm text-slate-500 font-medium">pagamento único</span>
               </div>
 
-              <ul className="space-y-2">
+              <div className="space-y-1 text-center">
+                <p className="text-sm font-bold text-slate-200">5 créditos — 5 homenagens completas em HD</p>
+                <p className="text-xs text-slate-500">Menos de R$ 6 por homenagem. Vídeo ou Livro de Memórias, do jeito que quiser.</p>
+              </div>
+
+              <ul className="space-y-2.5">
                 {[
-                  { icon: CheckCircle2, text: 'Libera este vídeo em HD, sem marca d\'água — arquivo seu, pra sempre' },
-                  { icon: Mail, text: 'Entrega automática por e-mail assim que o pagamento é aprovado (poucos minutos)' },
+                  { icon: CheckCircle2, text: 'Este vídeo, sem marca d\'água, já incluso — mais 4 homenagens pra criar quando quiser (mãe, avós, padrinhos, quem você escolher)' },
+                  { icon: Sparkles, text: 'Narração por IA ou com a sua própria voz clonada, ilustrações por IA, trilhas sonoras e legendas' },
+                  { icon: Share2, text: 'Cartão digital com QR code, pronto pra enviar direto no WhatsApp' },
+                  { icon: Mail, text: 'Acesso liberado na hora, direto após o pagamento — chega no seu e-mail em poucos minutos' },
                   { icon: ShieldCheck, text: 'Pagamento único — sem assinatura, sem mensalidade, sem cobrança recorrente' },
-                  { icon: ShieldCheck, text: 'Checkout seguro e criptografado' },
+                  { icon: ShieldCheck, text: 'Checkout seguro via PIX, boleto ou cartão' },
                 ].map(({ icon: Icon, text }) => (
-                  <li key={text} className="flex items-start gap-2 text-xs text-slate-300">
-                    <Icon className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
+                  <li key={text} className="flex items-start gap-2.5 text-sm text-slate-300">
+                    <Icon className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
                     <span>{text}</span>
                   </li>
                 ))}
               </ul>
-
-              <p className="text-[11px] text-slate-500 text-center leading-relaxed">
-                Essa compra libera <strong className="text-slate-400">este</strong> vídeo que você acabou de criar.
-                Quer fazer outra homenagem com outras fotos depois? É só criar uma nova prévia — cada vídeo é
-                liberado separadamente.
-              </p>
 
               <input
                 type="text"
                 value={unlockName}
                 onChange={(e) => setUnlockName(e.target.value)}
                 placeholder="Seu nome"
-                className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 text-sm focus:outline-none focus:border-amber-500"
+                className="w-full px-4 py-3.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 text-base focus:outline-none focus:border-amber-500"
               />
               <input
                 type="email"
@@ -699,27 +700,27 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaption
                 value={unlockEmail}
                 onChange={(e) => setUnlockEmail(e.target.value)}
                 placeholder="Seu melhor e-mail"
-                className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 text-sm focus:outline-none focus:border-amber-500"
+                className="w-full px-4 py-3.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 text-base focus:outline-none focus:border-amber-500"
               />
               <button
                 type="submit"
                 disabled={isRequestingUnlock}
-                className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-60 text-black font-extrabold text-sm rounded-xl shadow-lg transition-transform active:scale-98"
+                className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-60 text-black font-extrabold text-base rounded-xl shadow-lg transition-transform active:scale-98"
               >
-                {isRequestingUnlock ? 'Redirecionando...' : 'Liberar Vídeo em HD — R$ 29,90'}
+                {isRequestingUnlock ? 'Redirecionando...' : 'Liberar Tudo — R$ 29,90'}
               </button>
-              <p className="text-[11px] text-slate-500 text-center">
-                Você será redirecionado pro pagamento seguro da Payt. O vídeo em HD chega no seu e-mail assim que
-                confirmar — geralmente em poucos minutos.
+              <p className="text-xs text-slate-500 text-center leading-relaxed">
+                Você será redirecionado pro pagamento seguro da Payt. Seu vídeo em HD e o acesso à sua conta
+                (com mais 4 créditos) chegam no seu e-mail assim que confirmar — geralmente em poucos minutos.
               </p>
             </form>
           ) : (
             <button
               onClick={handleGenerateWatermarkedPreview}
               disabled={isRecordingExport}
-              className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-60 text-black font-bold text-sm rounded-xl shadow-md flex items-center justify-center gap-2 transition-all active:scale-98"
+              className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-60 text-black font-bold text-base rounded-xl shadow-md flex items-center justify-center gap-2 transition-all active:scale-98"
             >
-              <Download className="w-4 h-4" />
+              <Download className="w-5 h-5" />
               {isRecordingExport ? renderStatusLabel || 'Renderizando prévia...' : 'Gerar Prévia do Meu Vídeo'}
             </button>
           )
