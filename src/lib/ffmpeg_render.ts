@@ -238,7 +238,13 @@ function buildCaptionFilters(
     label = outLabel;
   }
 
-  const textOutline = caption.backgroundId === 'none' ? 'borderw=3:bordercolor=black@0.7' : '';
+  // O ":" final já vem dentro de textOutline (em vez de ser concatenado separado depois) — a
+  // versão antiga deixava um ":" sobrando entre fontcolor e x= quando não há contorno (ex:
+  // "fontcolor=0xFFFFFF::x=..."), que builds mais recentes/rígidos do FFmpeg (o binário de
+  // produção é baixado on-the-fly a cada deploy, então a versão pode mudar sem nenhuma mudança
+  // de código nossa) rejeitam com "No option name" — quebrando a renderização de QUALQUER vídeo
+  // com legenda com fundo (a maioria dos vídeos, já que "sem fundo" é a exceção).
+  const textOutline = caption.backgroundId === 'none' ? 'borderw=3:bordercolor=black@0.7:' : '';
 
   lines.forEach((line, lineIdx) => {
     const linePath = writeTempTextFile(line, `sub_${idx}_${lineIdx}`);
@@ -247,7 +253,7 @@ function buildCaptionFilters(
     const outLabel = `vsub${idx}_${lineIdx}`;
     filters.push(
       `[${label}]drawtext=textfile=${quoteFilterPath(linePath)}:fontfile=${quoteFilterPath(caption.fontPath)}:` +
-      `fontsize=${FONT_SIZE}:fontcolor=${caption.fontColor}:${textOutline}:` +
+      `fontsize=${FONT_SIZE}:fontcolor=${caption.fontColor}:${textOutline}` +
       `x=(w-text_w)/2:y=${lineY}:enable='${enableExpr}'[${outLabel}]`
     );
     label = outLabel;
