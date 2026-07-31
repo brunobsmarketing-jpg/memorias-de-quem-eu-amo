@@ -460,11 +460,20 @@ export async function renderVideoWithFFmpeg(params: RenderVideoParams): Promise<
         outputOptions.push('-c:a aac', '-b:a 192k', '-shortest');
       }
 
+      // fluent-ffmpeg só entrega no "error" a ÚLTIMA linha do stderr real do FFmpeg (ex: "Error :
+      // Invalid argument"), sem contexto nenhum de QUAL filtro/etapa falhou — insuficiente pra
+      // diagnosticar problemas que só acontecem no binário Linux de produção (diferente do
+      // ffmpeg-static usado localmente). Acumula o stderr inteiro aqui pra logar as últimas
+      // linhas de verdade quando der erro.
+      let stderrLog = '';
       command
         .outputOptions(outputOptions)
         .output(outputFilePath)
         .on('start', (cmdLine) => {
           console.log('🎬 Comando FFmpeg:', cmdLine);
+        })
+        .on('stderr', (line) => {
+          stderrLog += line + '\n';
         })
         .on('end', () => {
           console.log(`✅ Renderização FFmpeg concluída: ${outputFilePath}`);
@@ -474,7 +483,9 @@ export async function renderVideoWithFFmpeg(params: RenderVideoParams): Promise<
           resolve(publicVideoUrl);
         })
         .on('error', (err) => {
-          console.error('❌ Erro na renderização FFmpeg:', err);
+          const stderrTail = stderrLog.split('\n').filter(Boolean).slice(-20).join('\n');
+          console.error('❌ Erro na renderização FFmpeg:', err.message);
+          console.error('❌ Últimas linhas do stderr do FFmpeg:\n', stderrTail);
           tempFilesToDelete.forEach((f) => {
             if (fs.existsSync(f)) fs.unlinkSync(f);
           });
