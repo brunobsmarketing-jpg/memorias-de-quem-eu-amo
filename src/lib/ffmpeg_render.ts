@@ -104,7 +104,7 @@ const MIN_DURATION = 20;
 // no cálculo de totalDuration abaixo sobre por que não usar MIN_DURATION nesse caso.
 const NARRATION_MIN_DURATION = 6;
 const MAX_DURATION = 75;
-const NARRATION_TAIL_SECONDS = 1.5;
+const NARRATION_TAIL_SECONDS = 2.5;
 // Fontes empacotadas no próprio projeto (assets/fonts) em vez de um caminho do sistema operacional —
 // um caminho como "C:/Windows/Fonts/arial.ttf" não existiria no Linux do servidor de produção.
 // O título fixo do vídeo sempre usa a fonte padrão (Poppins); a legenda usa a tipografia

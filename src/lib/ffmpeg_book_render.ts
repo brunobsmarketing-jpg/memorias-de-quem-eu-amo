@@ -42,7 +42,7 @@ const MIN_DURATION = 15;
 const NARRATION_MIN_DURATION = 6;
 const MAX_DURATION = 90;
 const SECONDS_PER_PAGE = 5;
-const NARRATION_TAIL_SECONDS = 1.5;
+const NARRATION_TAIL_SECONDS = 2.5;
 // Duração da transição de "virar página" entre um slide e o próximo.
 const TRANSITION_DURATION = 0.8;
 // Zoom máximo do efeito Ken Burns sobre cada página parada.

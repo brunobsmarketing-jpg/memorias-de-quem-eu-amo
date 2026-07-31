@@ -53,6 +53,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaption
   const [isReady, setIsReady] = useState<boolean>(false);
   const [isRecordingExport, setIsRecordingExport] = useState<boolean>(false);
   const [renderStatusLabel, setRenderStatusLabel] = useState<string>('');
+  // Cache do MP4 em HD já renderizado no servidor — permite disparar o render em segundo plano
+  // assim que a pessoa chega na prévia (ela já pagou, não faz sentido exigir um clique a mais só
+  // pra começar a renderizar) e deixar o botão "Baixar" só baixar, sem re-renderizar.
+  const [renderedVideoUrl, setRenderedVideoUrl] = useState<string | null>(null);
+  const renderPromiseRef = useRef<Promise<string> | null>(null);
   const [captionStyle, setCaptionStyle] = useState<CaptionStyle>(video.captionStyle || DEFAULT_CAPTION_STYLE);
   // Estado só do funil "crie primeiro, pague depois" (trialMode) — a prévia com marca d'água
   // renderizada de verdade (não o canvas), e o mini-formulário de e-mail pra liberar via Payt.
@@ -131,7 +136,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaption
     if (narrationDuration && narrationDuration > 0) {
       const MIN_DURATION = 20;
       const MAX_DURATION = 75;
-      const NARRATION_TAIL_SECONDS = 1.5;
+      const NARRATION_TAIL_SECONDS = 2.5;
       setDuration(Math.min(MAX_DURATION, Math.max(MIN_DURATION, narrationDuration + NARRATION_TAIL_SECONDS)));
     }
   }, [narrationDuration]);
@@ -309,66 +314,105 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaption
     }
   };
 
-  // Envia o vídeo para a fila de renderização no servidor (FFmpeg) e acompanha o progresso
-  // via polling, em vez de manter a requisição HTTP aberta — em horários de pico o vídeo
-  // pode ficar alguns instantes na fila antes de começar a renderizar de fato (ver
-  // RenderQueue em server.ts), e uma conexão longa correria risco de timeout no proxy.
+  // Envia o vídeo para a fila de renderização no servidor (FFmpeg) e acompanha o progresso via
+  // polling, em vez de manter a requisição HTTP aberta — em horários de pico o vídeo pode ficar
+  // alguns instantes na fila antes de começar a renderizar de fato (ver RenderQueue em server.ts),
+  // e uma conexão longa correria risco de timeout no proxy.
+  //
+  // Deduplicado via renderPromiseRef: tanto o disparo automático em segundo plano (assim que a
+  // prévia aparece, ver useEffect abaixo) quanto um clique manual no botão "Baixar" chamam esta
+  // mesma função — sem o cache/ref, os dois iriam disparar renderizações duplicadas no servidor.
+  const ensureVideoRendered = (): Promise<string> => {
+    if (renderedVideoUrl) return Promise.resolve(renderedVideoUrl);
+    if (renderPromiseRef.current) return renderPromiseRef.current;
+
+    const promise = (async () => {
+      setIsRecordingExport(true);
+      setRenderStatusLabel('Enviando para a fila de renderização...');
+      try {
+        const response = await fetch('/api/render-video', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            videoId: video.id,
+            fatherName: video.fatherName,
+            photos: video.photos,
+            aiImages: video.aiGeneratedImages,
+            useAIImages: video.useAIImages,
+            tributeText: video.tributeText,
+            narrationAudioDataUrl: video.customVoiceAudioUrl,
+            selectedTrackId: video.selectedTrackId,
+            captionStyle,
+            aspectRatio: video.aspectRatio,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Falha ao enviar o vídeo para renderização no servidor.');
+        }
+
+        const { position } = await response.json();
+        setRenderStatusLabel(
+          position > 0
+            ? `Na fila (${position} vídeo${position > 1 ? 's' : ''} na sua frente)...`
+            : 'Renderizando vídeo em HD...'
+        );
+
+        const MAX_ATTEMPTS = 80; // até ~4min no total, cobre fila + renderização em picos
+        const POLL_INTERVAL_MS = 3000;
+        let mp4Url: string | null = null;
+
+        for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+          await wait(POLL_INTERVAL_MS);
+          const updated = await fetchVideoJobRemote(video.id);
+          if (updated?.unlockedVideoUrl) {
+            mp4Url = updated.unlockedVideoUrl;
+            break;
+          }
+          if (attempt === 4) {
+            setRenderStatusLabel('Ainda finalizando — pode haver fila em horários de pico...');
+          }
+        }
+
+        if (!mp4Url) {
+          throw new Error('A renderização está demorando mais do que o esperado. Tente novamente em instantes.');
+        }
+
+        setRenderedVideoUrl(mp4Url);
+        return mp4Url;
+      } finally {
+        setIsRecordingExport(false);
+        setRenderStatusLabel('');
+        renderPromiseRef.current = null;
+      }
+    })();
+
+    renderPromiseRef.current = promise;
+    return promise;
+  };
+
+  // A pessoa já pagou (crédito debitado na criação) e só está esperando o vídeo — não faz
+  // sentido exigir um clique a mais só pra COMEÇAR a renderizar. Assim que a prévia aparece
+  // (Passo 6), já dispara o render em HD em segundo plano; o botão "Baixar" só espera esse
+  // resultado (ou baixa na hora, se já tiver terminado). No funil de prévia (trialMode) isso
+  // continua manual de propósito — cada render ali tem custo de IA sem garantia de venda.
+  useEffect(() => {
+    if (trialMode) return;
+    ensureVideoRendered().catch((e: any) => {
+      console.error(e);
+      toast.error('Erro ao preparar o vídeo em HD: ' + e.message);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trialMode, video.id]);
+
   const handleDownloadVideo = async () => {
-    setIsRecordingExport(true);
-    setRenderStatusLabel('Enviando para a fila de renderização...');
     try {
-      const response = await fetch('/api/render-video', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          videoId: video.id,
-          fatherName: video.fatherName,
-          photos: video.photos,
-          aiImages: video.aiGeneratedImages,
-          useAIImages: video.useAIImages,
-          tributeText: video.tributeText,
-          narrationAudioDataUrl: video.customVoiceAudioUrl,
-          selectedTrackId: video.selectedTrackId,
-          captionStyle,
-          aspectRatio: video.aspectRatio,
-        }),
-      });
+      const mp4Url = await ensureVideoRendered();
 
-      if (!response.ok) {
-        throw new Error('Falha ao enviar o vídeo para renderização no servidor.');
-      }
-
-      const { position } = await response.json();
-      setRenderStatusLabel(
-        position > 0
-          ? `Na fila (${position} vídeo${position > 1 ? 's' : ''} na sua frente)...`
-          : 'Renderizando vídeo em HD...'
-      );
-
-      const MAX_ATTEMPTS = 80; // até ~4min no total, cobre fila + renderização em picos
-      const POLL_INTERVAL_MS = 3000;
-      let mp4Url: string | null = null;
-
-      for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-        await wait(POLL_INTERVAL_MS);
-        const updated = await fetchVideoJobRemote(video.id);
-        if (updated?.unlockedVideoUrl) {
-          mp4Url = updated.unlockedVideoUrl;
-          break;
-        }
-        if (attempt === 4) {
-          setRenderStatusLabel('Ainda finalizando — pode haver fila em horários de pico...');
-        }
-      }
-
-      if (!mp4Url) {
-        throw new Error('A renderização está demorando mais do que o esperado. Tente novamente em instantes.');
-      }
-
-      // Baixa o arquivo via fetch e cria uma blob URL (mesma origem da página) antes de
-      // disparar o download. O mp4Url é do Supabase Storage (outra origem) — a maioria dos
-      // navegadores ignora o atributo "download" em links de origem diferente e só abre/
-      // reproduz o vídeo em vez de salvar o arquivo, o que fazia o download "não funcionar".
+      // Baixa o arquivo via fetch e cria uma blob URL (mesma origem da página) antes de disparar
+      // o download. O mp4Url é do Supabase Storage (outra origem) — a maioria dos navegadores
+      // ignora o atributo "download" em links de origem diferente e só abre/reproduz o vídeo em
+      // vez de salvar o arquivo, o que fazia o download "não funcionar".
       setRenderStatusLabel('Preparando arquivo para download...');
       const videoBlob = await (await fetch(mp4Url)).blob();
       const blobUrl = URL.createObjectURL(videoBlob);
@@ -384,7 +428,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, editableCaption
       console.error(e);
       toast.error('Erro ao gerar o vídeo em MP4: ' + e.message);
     } finally {
-      setIsRecordingExport(false);
       setRenderStatusLabel('');
     }
   };
