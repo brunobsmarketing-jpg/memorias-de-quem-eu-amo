@@ -10,6 +10,7 @@ import {
   Sun,
   Moon,
   Zap,
+  MessageCircle,
 } from 'lucide-react';
 import { User, VideoJob, MemoryBookJob } from './types';
 import {
@@ -558,6 +559,16 @@ export default function App() {
           Memora © 2026 — Plataforma Exclusiva de Homenagens
         </p>
         <p>Acesso exclusivo para membros pagantes com gerador poético por IA, gravação de voz e cartões interativos.</p>
+        <p>
+          <a
+            href="https://wa.me/5511971918838"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-emerald-400 hover:underline font-bold inline-flex items-center gap-1"
+          >
+            <MessageCircle className="w-3.5 h-3.5" /> Falar com o Suporte no WhatsApp
+          </a>
+        </p>
         {user && user.isPaidMember && (
           <p>
             <button
