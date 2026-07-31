@@ -74,7 +74,8 @@ export const TrialLandingPage: React.FC<TrialLandingPageProps> = ({ onStart }) =
         </div>
 
         <h1 className="font-serif text-3xl sm:text-4xl font-semibold text-slate-100 tracking-tight leading-tight">
-          O Presente Que Vai Fazer Seu Pai Chorar de Emoção — Você Vê o Vídeo Antes de Pagar Qualquer Coisa
+          Crie um Presente Inesquecível para o Dia dos Pais — Suba Fotos Suas Com Seu Pai e Crie um Vídeo
+          Emocionante em Menos de 3 minutos — Com Música, Legendas e um Cartão Digital Para Enviar Direto Pra Ele
         </h1>
 
         <p className="text-slate-400 text-sm sm:text-base max-w-xl mx-auto leading-relaxed">
