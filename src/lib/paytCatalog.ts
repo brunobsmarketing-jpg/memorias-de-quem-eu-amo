@@ -23,11 +23,9 @@ export interface PaytProductDef {
  */
 export const PAYT_PRODUCT_CATALOG: Record<string, PaytProductDef> = {
   LGA6NY: { credits: 5, packageId: 'payt-5-creditos' },
-  // TODO: substituir 'TROCAR_PELO_CODIGO_REAL' pelo product.code real do produto de vídeo avulso
-  // assim que ele for criado no painel da Payt (mesmo processo usado pra confirmar o LGA6NY: o
-  // payload bruto do primeiro evento de teste aparece no log da Railway). Enquanto isso, o
-  // webhook falha fechado pra esse produto — nenhum vídeo é liberado indevidamente.
-  TROCAR_PELO_CODIGO_REAL: { credits: 0, packageId: 'payt-video-avulso', unlockType: 'single-video-unlock' },
+  // '4N6QVO' = produto de vídeo avulso sem marca d'água (funil "crie primeiro, pague depois"),
+  // R$ 29,90, criado no painel da Payt em 2026-07-31.
+  '4N6QVO': { credits: 0, packageId: 'payt-video-avulso', unlockType: 'single-video-unlock' },
 };
 
 /**
