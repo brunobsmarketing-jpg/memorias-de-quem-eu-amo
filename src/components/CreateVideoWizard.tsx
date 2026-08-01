@@ -408,6 +408,9 @@ export const CreateVideoWizard: React.FC<CreateVideoWizardProps> = ({
                   ? 'Gere a prévia com marca d\'água pra ver o resultado real — se gostar, é só liberar sem marca d\'água.'
                   : 'Baixe o vídeo em HD ou avance para pegar o link do Cartão Digital e enviar para o seu pai.'}
               </p>
+              <p className="text-amber-400 text-sm font-semibold">
+                ⏱️ Seu vídeo em HD fica pronto em até 30 segundos
+              </p>
             </div>
 
             {/* O estilo da legenda já foi escolhido no Passo 4, antes do vídeo ser gerado — não
